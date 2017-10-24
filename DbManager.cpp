@@ -34,16 +34,19 @@ bool DbManager::path_exists(const std::string &path) {
     }
     if (aux->find(*part) == aux->items().end()) {
       return false;
-    } else if (std::distance(part, tokens.end()) == 1) {
+    }
+    if (std::distance(part, tokens.end()) == 1) {
       // last token
       return true;
-    } else {
-
-      aux  = & aux->at(*part);
     }
+
+    aux  = & aux->at(*part);
+
   }
   return true;
 }
+
+
 folly::Optional<folly::dynamic> DbManager::get_path(const std::string &path) {
   std::vector<std::string> tokens = get_path_parts(path);
   folly::dynamic *aux = &_root;
@@ -91,7 +94,7 @@ void DbManager::deep_merge(folly::dynamic &dest, folly::dynamic &merge_obj) {
 }
 void DbManager::post(const std::string &path, const folly::dynamic &data) {
   LOG(INFO) << "Request to post to " << path;
-  if (!path_exists(path)) {
+  if (can_post(path)) {
     std::vector<std::string> tokens;
 
     boost::split(tokens, path, boost::is_any_of("/"));
@@ -141,5 +144,19 @@ void DbManager::remove(const std::string &path) {
       }
     }
   }
+}
+bool DbManager::can_post(const std::string &path) {
+  if (!path_exists(path)) return true;
+
+  auto parts = get_path_parts(path);
+  auto aux = &_root;
+  for (auto p = parts.begin(); p != parts.end(); ++p) {
+    if (std::distance(p, parts.end()) == 1) {
+      return aux->isArray();
+    }
+    aux = &aux->at(*p);
+
+  }
+  return false;
 }
 }

@@ -9,7 +9,7 @@
 namespace restdbxx {
 class LoggingFilter : public proxygen::Filter{
  public:
-  LoggingFilter(proxygen::RequestHandler *upstream);
+  explicit LoggingFilter(proxygen::RequestHandler *upstream);
   void onRequest(std::unique_ptr<proxygen::HTTPMessage> headers) noexcept override;
   void onBody(std::unique_ptr<folly::IOBuf> body) noexcept override;
   void sendHeaders(proxygen::HTTPMessage &msg) noexcept override;

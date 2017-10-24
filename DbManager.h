@@ -22,15 +22,15 @@ class DbManager {
 
   folly::Optional<folly::dynamic> get_path(const std::string &path);
 
-  bool path_exists(const std::string& path);
-
-  folly::dynamic to_deep_object(std::vector<std::string> &path, const folly::dynamic& unwrapped);
+  bool path_exists(const std::string &path);
+  bool can_post(const std::string &path);
+  folly::dynamic to_deep_object(std::vector<std::string> &path, const folly::dynamic &unwrapped);
 
   void deep_merge(folly::dynamic &dest, folly::dynamic &merge_obj);
-  void post(const std::string& path, const folly::dynamic &data);
-  void put(const std::string& path, const folly::dynamic& data);
+  void post(const std::string &path, const folly::dynamic &data);
+  void put(const std::string &path, const folly::dynamic &data);
 
-  void remove(const std::string& path);
+  void remove(const std::string &path);
   void debug_root() {
 
     LOG(INFO) << folly::toPrettyJson(_root);
