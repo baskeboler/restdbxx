@@ -13,9 +13,6 @@ static const char *INDEX_BODY = "<html>"
     "</head>"
     "<body>"
     "<h1>RESTDB INDEX</h1>"
-    "<h2>welcome to pussy paradise</h2>"
-    "<h3>Nah, JK</h3>"
-    "<p>get lost, looser</p>"
     "</body>"
     "</html>";
 void RestDbRequestHandler::onRequest(std::unique_ptr<proxygen::HTTPMessage> headers) noexcept {

@@ -19,6 +19,23 @@ DbManager::DbManager(): _root(folly::dynamic::object()) {
   //_root = folly::dynamic::object();
 
   //_root.
+  auto opts = rocksdb::DBOptions();
+  opts.create_if_missing = true;
+  std::vector<std::string> cfs;
+  auto status = rocksdb::DB::ListColumnFamilies(opts, "/tmp/restdb", &cfs);
+  if (!status.ok()) {
+    LOG(ERROR) << status.ToString();
+  }
+
+    std::vector<rocksdb::ColumnFamilyDescriptor> descrs;
+  for (auto n: cfs) {
+    descrs.push_back(rocksdb::ColumnFamilyDescriptor(n, rocksdb::ColumnFamilyOptions()));
+  }
+  status = rocksdb::DB::Open(opts, "/tmp/restdb", descrs, &handles, &_db);
+  if (!status.ok()) {
+    LOG(ERROR) << status.ToString();
+  }
+
 }
 bool DbManager::path_exists(const std::string &path) {
   std::vector<std::string> tokens;
@@ -158,5 +175,41 @@ bool DbManager::can_post(const std::string &path) {
 
   }
   return false;
+}
+DbManager::~DbManager() {
+  for (auto h: handles) {
+    auto s = _db->DestroyColumnFamilyHandle(h);
+    if (!s.ok()) LOG(ERROR) << s.ToString();
+  }
+  delete _db;
+}
+void DbManager::add_endpoint(const std::string &path) {
+  using rocksdb::DB;
+  using google::WARNING;
+
+  rocksdb::ColumnFamilyHandle *handle;
+
+  auto cfOpts = rocksdb::ColumnFamilyOptions();
+  auto status = _db->CreateColumnFamily(cfOpts, path, &handle);
+  if (!status.ok()) {
+    VLOG(WARNING) << "Error creating column family: " << status.ToString();
+  }
+  auto writeOpts = rocksdb::WriteOptions();
+
+  folly::dynamic val = folly::dynamic::array();
+  status = _db->Put(writeOpts, _db->DefaultColumnFamily(), path, "[]");
+  if (!status.ok()) {
+    VLOG(WARNING) << "Error creating column family: " << status.ToString();
+  }
+}
+std::vector<std::string> DbManager::get_endpoints() const {
+  auto opts = rocksdb::ReadOptions();
+  auto iterator = _db->NewIterator(opts);
+  std::vector<std::string> res;
+  iterator->SeekToFirst();
+  while (iterator->Valid()) {
+    res.push_back(iterator->key().ToString());
+  }
+  return res;
 }
 }

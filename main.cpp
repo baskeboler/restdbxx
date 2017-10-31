@@ -1,11 +1,12 @@
+#include <unistd.h>
+#include <string>
+
 #include <iostream>
 #include <folly/init/Init.h>
-#include "DbManager.h"
 #include <gflags/gflags.h>
 #include <folly/io/async/EventBaseManager.h>
 #include <proxygen/httpserver/HTTPServer.h>
-#include <folly/init/Init.h>
-#include <unistd.h>
+#include "DbManager.h"
 
 #include "RestDbRequestHandlerFactory.h"
 
@@ -27,8 +28,8 @@ DEFINE_int32(threads, 0, "Number of threads to listen on. Numbers <= 0 "
 
 
 int main(int argc, char ** argv) {
-  gflags::ParseCommandLineFlags(&argc, &argv, true);
   folly::init(&argc, &argv);
+  gflags::ParseCommandLineFlags(&argc, &argv, true);
   google::InstallFailureSignalHandler();
 
   std::vector<HTTPServer::IPConfig> IPs = {

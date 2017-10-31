@@ -10,6 +10,7 @@
 #include <folly/dynamic.h>
 #include <folly/Optional.h>
 #include <folly/json.h>
+#include <rocksdb/db.h>
 #include <folly/ExceptionWrapper.h>
 #ifndef _NDEBUG
 #include <glog/logging.h>
@@ -35,11 +36,22 @@ class DbManager {
 
     LOG(INFO) << folly::toPrettyJson(_root);
   }
+  
+  void add_endpoint(const std::string& path);
+
+  std::vector<std::string> get_endpoints() const;
+  bool is_endpoint(const std::string& path) const {
+    auto eps = get_endpoints();
+    return std::find(eps.begin(), eps.end(), path) != eps.end();
+  }
 
   static std::shared_ptr<DbManager> get_instance();
+  virtual ~DbManager();
  private:
+  rocksdb::DB* _db;
   folly::dynamic _root;
   std::vector<std::string> get_path_parts(const std::string &path) const;
+  std::vector<rocksdb::ColumnFamilyHandle *> handles;
 };
 
 }
