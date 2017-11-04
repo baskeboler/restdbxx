@@ -8,6 +8,8 @@
 #include <folly/ExceptionWrapper.h>
 #include <proxygen/httpserver/ResponseBuilder.h>
 namespace restdbxx {
+using namespace proxygen;
+
 static const char *INDEX_BODY = "<html>"
     "<head>"
     "</head>"
@@ -15,49 +17,60 @@ static const char *INDEX_BODY = "<html>"
     "<h1>RESTDB INDEX</h1>"
     "</body>"
     "</html>";
-void RestDbRequestHandler::onRequest(std::unique_ptr<proxygen::HTTPMessage> headers) noexcept {
+
+void RestDbRequestHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexcept {
   auto db = DbManager::get_instance();
+  //_headers = std::move(headers);
 
   if (headers->getMethod()) {
     _method = headers->getMethod().get();
   }
   _path = headers->getPath();
-  auto p = headers->getPath();
-  if ((_method == proxygen::HTTPMethod::GET || _method == proxygen::HTTPMethod::PUT
-      || _method == proxygen::HTTPMethod::DELETE) && !db->path_exists(p)) {
-    proxygen::ResponseBuilder(downstream_)
-        .status(404, "Not Found")
-        .sendWithEOM();
-    return;
+  //auto p = headers->getPath();
+  if (headers->getHeaders().exists("RESTDBXX_ADD_ENDPOINT"))
+    is_endpoint_add = true;
+
+  switch (_method) {
+    case HTTPMethod::GET:
+      if (_path == "/") {
+        ResponseBuilder(downstream_)
+            .status(200, "OK")
+            .body(INDEX_BODY)
+            .sendWithEOM();
+        return;
+      }
+      break;
+    case HTTPMethod::POST:
+      break;
+    case HTTPMethod::PUT:
+      break;
+    case HTTPMethod::DELETE:
+      break;
   }
-  if (_method == proxygen::HTTPMethod::GET) {
-    if (p == "/") {
-      proxygen::ResponseBuilder(downstream_)
-          .status(200, "OK")
-          .body(INDEX_BODY)
-          .sendWithEOM();
-      return;
-    }
+  if (_method == HTTPMethod::GET) {
+
 
     folly::try_and_catch<std::exception, std::runtime_error>([&]() {
-        auto json = *db->get_path(p);
-        auto jsonStr = folly::toPrettyJson(json);
-        proxygen::ResponseBuilder(downstream_)
-            .status(200, "OK")
-            .body(jsonStr.c_str())
-            .sendWithEOM();
-      })/*.handle([&](std::exception& e) {
+      auto json = *db->get(_path);
+      auto jsonStr = folly::toPrettyJson(json);
+      ResponseBuilder(downstream_)
+          .status(200, "OK")
+          .body(jsonStr.c_str())
+          .sendWithEOM();
+    })/*.handle([&](std::exception& e) {
         LOG(INFO) << e.what();
 
-        proxygen::ResponseBuilder(downstream_)
+        ResponseBuilder(downstream_)
             .status(500, "mayhem")
             .body("dont delete root")
             .sendWithEOM();
       })*/;
 
-  } else if (_method == proxygen::HTTPMethod::DELETE) {
-    if (p == "/") {
-      proxygen::ResponseBuilder(downstream_)
+  } else if (_method == HTTPMethod::POST) {
+
+  } else if (_method == HTTPMethod::DELETE) {
+    if (_path == "/") {
+      ResponseBuilder(downstream_)
           .status(500, "mayhem")
           .body("dont delete root")
           .sendWithEOM();
@@ -65,15 +78,15 @@ void RestDbRequestHandler::onRequest(std::unique_ptr<proxygen::HTTPMessage> head
     }
 
     folly::try_and_catch<std::exception, std::runtime_error>([&]() {
-         db->remove(p);
-        //auto jsonStr = folly::toPrettyJson(json);
-        proxygen::ResponseBuilder(downstream_)
-            .status(200, "OK")
-            .sendWithEOM();
-      })/*.handle([&](std::exception& e) {
+      db->remove(_path);
+      //auto jsonStr = folly::toPrettyJson(json);
+      ResponseBuilder(downstream_)
+          .status(200, "OK")
+          .sendWithEOM();
+    })/*.handle([&](std::exception& e) {
         LOG(INFO) << e.what();
 
-        proxygen::ResponseBuilder(downstream_)
+        ResponseBuilder(downstream_)
             .status(500, "mayhem")
             .body("mierda")
             .sendWithEOM();
@@ -81,7 +94,20 @@ void RestDbRequestHandler::onRequest(std::unique_ptr<proxygen::HTTPMessage> head
 
   }
 
+  if (not_found()) {
+    ResponseBuilder(downstream_)
+        .status(404, "Not Found")
+        .sendWithEOM();
+    return;
+  }
+
 }
+bool RestDbRequestHandler::not_found() const {
+  auto db = DbManager::get_instance();
+  return (this->_method == HTTPMethod::GET || this->_method == HTTPMethod::PUT
+      || this->_method == HTTPMethod::DELETE) && !db->path_exists(this->_path);
+}
+
 void RestDbRequestHandler::onBody(std::unique_ptr<folly::IOBuf> body) noexcept {
   if (_body)
     _body->prependChain(std::move(body));
@@ -89,46 +115,52 @@ void RestDbRequestHandler::onBody(std::unique_ptr<folly::IOBuf> body) noexcept {
     _body = std::move(body);
 }
 
-void RestDbRequestHandler::onUpgrade(proxygen::UpgradeProtocol prot) noexcept {
-
-}
-
 void RestDbRequestHandler::onEOM() noexcept {
-  if (_method == proxygen::HTTPMethod::POST) {
+
+  if (_method == HTTPMethod::POST) {
 
     folly::try_and_catch<std::exception, std::runtime_error>([&]() {
 
-      auto str = _body->moveToFbString();
+      //folly::StringPiece s(_body->buffer(), _body->length());
+
+      std::string str;
+      this->_body->copyBuffer(str);
       auto obj = folly::parseJson(str);
       auto db = DbManager::get_instance();
       db->post(_path, obj);
-      proxygen::ResponseBuilder(downstream_)
+      ResponseBuilder(downstream_)
           .status(201, "Created")
-          .header(proxygen::HTTPHeaderCode::HTTP_HEADER_CONTENT_TYPE, "application/json")
-          .body(str)
+          .header(HTTPHeaderCode::HTTP_HEADER_CONTENT_TYPE, "application/json")
+          .body(folly::toPrettyJson(obj))
           .sendWithEOM();
     });
-  } else if (_method == proxygen::HTTPMethod::PUT) {
+  } else if (_method == HTTPMethod::PUT) {
     folly::try_and_catch<std::exception, std::runtime_error>([&]() {
 
-      auto str = _body->moveToFbString();
+      std::string str;
+      this->_body->copyBuffer(str);
       auto obj = folly::parseJson(str);
       auto db = DbManager::get_instance();
       db->put(_path, obj);
-      proxygen::ResponseBuilder(downstream_)
+      ResponseBuilder(downstream_)
           .status(200, "OK")
-          .header(proxygen::HTTPHeaderCode::HTTP_HEADER_CONTENT_TYPE, "application/json")
+          .header(HTTPHeaderCode::HTTP_HEADER_CONTENT_TYPE, "application/json")
           .body(str)
           .sendWithEOM();
     });
+  } else {
   }
+
 }
 
 void RestDbRequestHandler::requestComplete()noexcept {
   delete this;
 }
 
-void RestDbRequestHandler::onError(proxygen::ProxygenError err) noexcept {
+void RestDbRequestHandler::onError(ProxygenError err) noexcept {
   delete this;
+}
+void RestDbRequestHandler::onUpgrade(proxygen::UpgradeProtocol prot)noexcept {
+
 }
 }

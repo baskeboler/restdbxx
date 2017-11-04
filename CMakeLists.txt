@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.5)
 project(restdbxx)
 
 set(CMAKE_CXX_STANDARD 14)
-#set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_BUILD_TYPE Debug)
 
 set(BOOST_USE_STATIC_LIBS ON)
 set(BOOST_USE_MULTITHREADED ON)
@@ -54,7 +54,7 @@ set(LIBS
         ${jemalloc}
         )
 
-set(SOURCE_FILES main.cpp DbManager.cpp DbManager.h RestDbRequestHandler.cpp RestDbRequestHandler.h RestDbRequestHandlerFactory.cpp RestDbRequestHandlerFactory.h LoggingFilter.cpp LoggingFilter.h HierarchyDb.cpp HierarchyDb.h)
+set(SOURCE_FILES main.cpp DbManager.cpp DbManager.h RestDbRequestHandler.cpp RestDbRequestHandler.h RestDbRequestHandlerFactory.cpp RestDbRequestHandlerFactory.h LoggingFilter.cpp LoggingFilter.h User.cpp User.h UserManager.cpp UserManager.h UserRequestHandler.cpp UserRequestHandler.h UserRequestHandlerFactory.cpp UserRequestHandlerFactory.h Validations.cpp Validations.h)
 add_executable(restdbxx ${SOURCE_FILES})
 
 target_link_libraries(restdbxx ${LIBS})

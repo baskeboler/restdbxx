@@ -3,134 +3,133 @@
 //
 
 #include "DbManager.h"
-#include <iterator>
 #include <folly/Singleton.h>
-#include <folly/dynamic-inl.h>
-
-namespace restdbxx    {
+namespace restdbxx {
 namespace {
 struct DbManagerSingletonTag {};
+folly::Singleton<DbManager, DbManagerSingletonTag> the_instance;
 }
 
-static folly::Singleton<DbManager, DbManagerSingletonTag> the_instance;
-
-DbManager::DbManager(): _root(folly::dynamic::object()) {
+DbManager::DbManager() : _root(folly::dynamic::object()) {
 
   //_root = folly::dynamic::object();
-
+  using google::GLOG_INFO;
+  using google::GLOG_ERROR;
   //_root.
-  auto opts = rocksdb::DBOptions();
+  VLOG(GLOG_INFO) << "Initializing DbManager";
+  auto opts = rocksdb::Options();
+  //auto dbOpts = rocksdb::DBOptions();
   opts.create_if_missing = true;
+  //dbOpts.
   std::vector<std::string> cfs;
-  auto status = rocksdb::DB::ListColumnFamilies(opts, "/tmp/restdb", &cfs);
+
+  rocksdb::DB *aux;
+  auto status = rocksdb::DB::Open(opts, "/tmp/restdb", &aux);
   if (!status.ok()) {
-    LOG(ERROR) << status.ToString();
+    VLOG(GLOG_ERROR) << status.ToString();
+  }
+  delete aux;
+
+  status = rocksdb::DB::ListColumnFamilies(opts, "/tmp/restdb", &cfs);
+  if (!status.ok()) {
+    VLOG(GLOG_ERROR) << status.ToString();
   }
 
-    std::vector<rocksdb::ColumnFamilyDescriptor> descrs;
-  for (auto n: cfs) {
-    descrs.push_back(rocksdb::ColumnFamilyDescriptor(n, rocksdb::ColumnFamilyOptions()));
+  std::vector<rocksdb::ColumnFamilyDescriptor> descrs;
+  for (const auto &n: cfs) {
+    descrs.emplace_back(n, rocksdb::ColumnFamilyOptions());
   }
   status = rocksdb::DB::Open(opts, "/tmp/restdb", descrs, &handles, &_db);
   if (!status.ok()) {
     LOG(ERROR) << status.ToString();
   }
-
-}
-bool DbManager::path_exists(const std::string &path) {
-  std::vector<std::string> tokens;
-
-  boost::split(tokens, path, boost::is_any_of("/"), boost::token_compress_on);
-  folly::dynamic *aux = &_root;
-  for (auto part =tokens.begin(); part != tokens.end(); ++part) {
-    if ((*part).length() == 0) continue;
-    LOG(INFO) << "Checking part " << *part;
-
-    if (!aux->isObject()) {
-      return false;
-    }
-    if (aux->find(*part) == aux->items().end()) {
-      return false;
-    }
-    if (std::distance(part, tokens.end()) == 1) {
-      // last token
-      return true;
-    }
-
-    aux  = & aux->at(*part);
-
+  VLOG(GLOG_INFO) << "Listing column families";
+  for (auto handle: handles) {
+    VLOG(GLOG_INFO) << handle->GetName();
+    cfh_map.emplace(handle->GetName(), handle);
   }
-  return true;
-}
+  VLOG(GLOG_INFO) << "End of column families";
 
-
-folly::Optional<folly::dynamic> DbManager::get_path(const std::string &path) {
-  std::vector<std::string> tokens = get_path_parts(path);
-  folly::dynamic *aux = &_root;
-  for (const auto &part: tokens) {
-    auto n = aux->find(part);
-    if (n == aux->items().end()) {
-      return folly::none;
-    }
-    aux = & n->second;
-    //aux = aux[part];
+  if (!is_endpoint("/test_endpoint")) {
+    VLOG(GLOG_INFO) << "Test endpoint inexistent, creating.";
+    add_endpoint("/test_endpoint");
+    add_endpoint(USERS_CF);
   }
-  return *aux;
+
 }
-std::vector<std::string> DbManager::get_path_parts(const std::string &path) const {
+bool DbManager::path_exists(const std::string path) {
+
+  std::string val;
+  auto readOpts = rocksdb::ReadOptions();
+  //bool may_exist = _db->KeyMayExist(readOpts, path, &val);
+  //if (!may_exist) return false;
+  //else {
+  auto s = _db->Get(readOpts, path, &val);
+  return !s.IsNotFound();
+  //}
+}
+
+std::vector<std::string> DbManager::get_path_parts(const std::string path) const {
   std::vector<std::__cxx11::string> tokens;
   std::string path_copy = path;
   boost::erase_first(path_copy, "/");
   split(tokens, path_copy, boost::is_any_of("/"));
   return tokens;
 }
-folly::dynamic DbManager::to_deep_object(std::vector<std::string> &path, const folly::dynamic &unwrapped) {
-  if (path.empty())
-    return unwrapped;
-  std::string last = *path.rbegin();
-  path.pop_back();
-  if (!last.empty())
-    return to_deep_object(path, folly::dynamic::object(last, unwrapped));
-  return to_deep_object(path, unwrapped);
-}
-void DbManager::deep_merge(folly::dynamic &dest, folly::dynamic &merge_obj) {
-  if (merge_obj.isObject()) {
 
-    for(auto &pair: merge_obj.items()) {
-      if (pair.second.isObject()) {
-        if (dest.find(pair.first) == dest.items().end()) {
-          dest[pair.first] = pair.second;
-        } else {
-          deep_merge(dest[pair.first], pair.second);
-        }
-      } else {
-        dest[pair.first] = pair.second;
-      }
-    }
-  }
-}
-void DbManager::post(const std::string &path, const folly::dynamic &data) {
-  LOG(INFO) << "Request to post to " << path;
+void DbManager::post(const std::string path, folly::dynamic &data) {
+  using google::GLOG_INFO;
+  using google::GLOG_ERROR;
+
+  VLOG(GLOG_INFO) << "Request to post to " << path;
   if (can_post(path)) {
-    std::vector<std::string> tokens;
+    using rocksdb::DB;
+    VLOG(GLOG_INFO) << "Can post to path: CONFIRMED";
+    auto writeOpts = rocksdb::WriteOptions();
+    auto readOpts = rocksdb::ReadOptions();
+    //auto txn = _db->BeginTransaction(writeOpts);
+    std::string next_id;
+    VLOG(GLOG_INFO) << "Getting " << path;
+    auto s = _db->Get(readOpts, _db->DefaultColumnFamily(), path, &next_id);
+    if (!s.ok()) {
+      VLOG(GLOG_ERROR) << s.ToString();
+    }
+    data.insert("ID", std::string(next_id));
+    std::string new_path = path + "/" + next_id;
+    std::string new_val = folly::toPrettyJson(data);
+
+    rocksdb::WriteBatch batch;
+    batch.Put(cfh_map.at(path), new_path, new_val);
+    int id = std::stoi(next_id);
+    id++;
+    batch.Put(path, std::to_string(id));
+    s = _db->Write(rocksdb::WriteOptions(), &batch);
+//auto s = txn->Commit();
+    if (!s.ok()) {
+      VLOG(GLOG_ERROR) << s.ToString();
+    }
+    //delete txn;
+
+    /*std::vector<std::string> tokens;
 
     boost::split(tokens, path, boost::is_any_of("/"));
     LOG(INFO) << "Tokens: " << tokens.size() << " - " <<  tokens;
     folly::dynamic deep_obj = to_deep_object(tokens, data);
     LOG(INFO) << "Deep obj: " << folly::toPrettyJson(deep_obj);
-    deep_merge(_root, deep_obj);
-  }
+    deep_merge(_root, deep_obj);*/
+  } else
+    VLOG(GLOG_INFO) << "Can post to path: DENIED";
 }
 
 std::shared_ptr<DbManager> DbManager::get_instance() {
   return the_instance.try_get();
 }
-void DbManager::put(const std::string &path, const folly::dynamic &data) {
+void DbManager::put(const std::string path, const folly::dynamic &data) {
   LOG(INFO) << "Request to put to: " << path;
   if (path_exists(path)) {
     auto tokens = get_path_parts(path);
     auto aux = &_root;
-    for (auto part = tokens.begin(); part != tokens.end(); ++part){
+    for (auto part = tokens.begin(); part != tokens.end(); ++part) {
       if (std::distance(part, tokens.end()) == 1) {
         //(*aux)[*part] = data;
         aux->insert(*part, data);
@@ -142,13 +141,13 @@ void DbManager::put(const std::string &path, const folly::dynamic &data) {
     }
   }
 }
-void DbManager::remove(const std::string &path) {
+void DbManager::remove(const std::string path) {
   //folly::make_exception_wrapper()
   if (path_exists(path)) {
     auto parts = get_path_parts(path);
-    auto aux = & _root;
+    auto aux = &_root;
 
-    for (auto part = parts.begin(); part != parts.end(); ++part ) {
+    for (auto part = parts.begin(); part != parts.end(); ++part) {
       if (std::distance(part, parts.end()) == 1) {
         //last part
         aux->erase(*part);
@@ -162,8 +161,8 @@ void DbManager::remove(const std::string &path) {
     }
   }
 }
-bool DbManager::can_post(const std::string &path) {
-  if (!path_exists(path)) return true;
+bool DbManager::can_post(const std::string path) {
+  /*if (!path_exists(path)) return true;
 
   auto parts = get_path_parts(path);
   auto aux = &_root;
@@ -174,7 +173,8 @@ bool DbManager::can_post(const std::string &path) {
     aux = &aux->at(*p);
 
   }
-  return false;
+  return false;*/
+  return is_endpoint(path);
 }
 DbManager::~DbManager() {
   for (auto h: handles) {
@@ -183,7 +183,7 @@ DbManager::~DbManager() {
   }
   delete _db;
 }
-void DbManager::add_endpoint(const std::string &path) {
+void DbManager::add_endpoint(const std::string path) {
   using rocksdb::DB;
   using google::WARNING;
 
@@ -194,10 +194,11 @@ void DbManager::add_endpoint(const std::string &path) {
   if (!status.ok()) {
     VLOG(WARNING) << "Error creating column family: " << status.ToString();
   }
+  cfh_map.emplace(path, handle);
   auto writeOpts = rocksdb::WriteOptions();
 
   folly::dynamic val = folly::dynamic::array();
-  status = _db->Put(writeOpts, _db->DefaultColumnFamily(), path, "[]");
+  status = _db->Put(writeOpts, _db->DefaultColumnFamily(), path, "0");
   if (!status.ok()) {
     VLOG(WARNING) << "Error creating column family: " << status.ToString();
   }
@@ -209,7 +210,49 @@ std::vector<std::string> DbManager::get_endpoints() const {
   iterator->SeekToFirst();
   while (iterator->Valid()) {
     res.push_back(iterator->key().ToString());
+    iterator->Next();
   }
+  delete iterator;
   return res;
+}
+folly::Optional<folly::dynamic> DbManager::get(const std::string path) const {
+  using folly::parseJson;
+  using google::GLOG_INFO;
+
+  auto readOpts = rocksdb::ReadOptions();
+  if (is_endpoint(path)) {
+    folly::dynamic ret = folly::dynamic::array();
+    auto it = _db->NewIterator(readOpts, cfh_map.at(path));
+    it->SeekToFirst();
+    VLOG(GLOG_INFO) << "iterating cf";
+    while (it->Valid()) {
+      VLOG(GLOG_INFO) << it->key().ToString() << ": " << it->value().ToString();
+      std::string value = it->value().ToString();
+      folly::dynamic v = parseJson(value);
+      ret.push_back(v);
+      it->Next();
+    }
+
+    return ret;
+  }
+
+  std::string value;
+  bool found = false;
+  bool may_exist = _db->KeyMayExist(readOpts, path, &value, &found);
+  if (found) {
+    return parseJson(value);
+  }
+  if (may_exist) {
+    auto s = _db->Get(readOpts, path, &value);
+    if (s.ok()) {
+      return parseJson(value);
+    }
+  }
+
+  return folly::none;
+}
+bool DbManager::is_endpoint(const std::string& path) const {
+  auto eps = get_endpoints();
+  return std::find(eps.begin(), eps.end(), path) != eps.end();
 }
 }

@@ -20,8 +20,11 @@ class RestDbRequestHandler: public proxygen::RequestHandler {
 
  private:
   std::unique_ptr<folly::IOBuf> _body;
+  std::unique_ptr<proxygen::HTTPMessage> _headers;
   proxygen::HTTPMethod _method;
   std::string _path;
+  bool not_found() const;
+  bool is_endpoint_add = false;
 };
 
 }
