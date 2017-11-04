@@ -4,6 +4,7 @@
 
 #include "RestDbRequestHandler.h"
 #include "DbManager.h"
+#include "Validations.h"
 #include <folly/json.h>
 #include <folly/ExceptionWrapper.h>
 #include <proxygen/httpserver/ResponseBuilder.h>
@@ -26,81 +27,64 @@ void RestDbRequestHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexc
     _method = headers->getMethod().get();
   }
   _path = headers->getPath();
+  Validations::sanitize_path(_path);
   //auto p = headers->getPath();
   if (headers->getHeaders().exists("RESTDBXX_ADD_ENDPOINT"))
     is_endpoint_add = true;
 
   switch (_method) {
     case HTTPMethod::GET:
-      if (_path == "/") {
-        ResponseBuilder(downstream_)
-            .status(200, "OK")
-            .body(INDEX_BODY)
-            .sendWithEOM();
+      if (_path == "") {
+        sendStringResponse(INDEX_BODY);
         return;
       }
+
+      folly::try_and_catch<std::exception, std::runtime_error>([&]() {
+        auto json = *db->get(_path);
+        sendJsonResponse(json);
+      });
       break;
-    case HTTPMethod::POST:
-      break;
-    case HTTPMethod::PUT:
-      break;
+    case HTTPMethod::POST:break;
+    case HTTPMethod::PUT:break;
     case HTTPMethod::DELETE:
+      if (_path == "") {
+        sendStringResponse("dont delete root", 500, "not cool, bro");
+        return;
+      }
+
+      folly::try_and_catch<std::exception, std::runtime_error>([&]() {
+        db->remove(_path);
+
+        sendEmptyContentResponse(200, "OK");
+      });
       break;
-  }
-  if (_method == HTTPMethod::GET) {
-
-
-    folly::try_and_catch<std::exception, std::runtime_error>([&]() {
-      auto json = *db->get(_path);
-      auto jsonStr = folly::toPrettyJson(json);
-      ResponseBuilder(downstream_)
-          .status(200, "OK")
-          .body(jsonStr.c_str())
-          .sendWithEOM();
-    })/*.handle([&](std::exception& e) {
-        LOG(INFO) << e.what();
-
-        ResponseBuilder(downstream_)
-            .status(500, "mayhem")
-            .body("dont delete root")
-            .sendWithEOM();
-      })*/;
-
-  } else if (_method == HTTPMethod::POST) {
-
-  } else if (_method == HTTPMethod::DELETE) {
-    if (_path == "/") {
-      ResponseBuilder(downstream_)
-          .status(500, "mayhem")
-          .body("dont delete root")
-          .sendWithEOM();
-      return;
-    }
-
-    folly::try_and_catch<std::exception, std::runtime_error>([&]() {
-      db->remove(_path);
-      //auto jsonStr = folly::toPrettyJson(json);
-      ResponseBuilder(downstream_)
-          .status(200, "OK")
-          .sendWithEOM();
-    })/*.handle([&](std::exception& e) {
-        LOG(INFO) << e.what();
-
-        ResponseBuilder(downstream_)
-            .status(500, "mayhem")
-            .body("mierda")
-            .sendWithEOM();
-      })*/;
-
+    default: break;
   }
 
   if (not_found()) {
-    ResponseBuilder(downstream_)
-        .status(404, "Not Found")
-        .sendWithEOM();
-    return;
+    sendEmptyContentResponse(404, "Not Found");
+
   }
 
+}
+void RestDbRequestHandler::sendStringResponse(const std::string &body, int status, const std::string &message) const {
+  ResponseBuilder(downstream_)
+      .status(500, "mayhem")
+      .body("dont delete root")
+      .sendWithEOM();
+}
+void RestDbRequestHandler::sendEmptyContentResponse(int status, const std::string &message) const {
+  ResponseBuilder(downstream_)
+      .status(status, message)
+      .sendWithEOM();
+}
+void RestDbRequestHandler::sendJsonResponse(const folly::dynamic &json, int status, const std::string &message) const {
+  auto jsonStr = toPrettyJson(json);
+  ResponseBuilder(downstream_)
+      .status(200, "OK")
+      .header(HTTP_HEADER_CONTENT_TYPE, "application/json")
+      .body(jsonStr.c_str())
+      .sendWithEOM();
 }
 bool RestDbRequestHandler::not_found() const {
   auto db = DbManager::get_instance();
@@ -124,36 +108,31 @@ void RestDbRequestHandler::onEOM() noexcept {
       //folly::StringPiece s(_body->buffer(), _body->length());
 
       std::string str;
-      this->_body->copyBuffer(str);
-      auto obj = folly::parseJson(str);
+      auto copy = _body->cloneCoalescedAsValue();
+      auto obj = folly::parseJson(copy.moveToFbString().toStdString());
       auto db = DbManager::get_instance();
       db->post(_path, obj);
-      ResponseBuilder(downstream_)
-          .status(201, "Created")
-          .header(HTTPHeaderCode::HTTP_HEADER_CONTENT_TYPE, "application/json")
-          .body(folly::toPrettyJson(obj))
-          .sendWithEOM();
+      sendJsonResponse(obj, 201, "Created");
+
     });
   } else if (_method == HTTPMethod::PUT) {
     folly::try_and_catch<std::exception, std::runtime_error>([&]() {
 
       std::string str;
-      this->_body->copyBuffer(str);
-      auto obj = folly::parseJson(str);
+      auto copy = _body->cloneCoalescedAsValue();
+      auto obj = folly::parseJson(copy.moveToFbString().toStdString());
       auto db = DbManager::get_instance();
       db->put(_path, obj);
-      ResponseBuilder(downstream_)
-          .status(200, "OK")
-          .header(HTTPHeaderCode::HTTP_HEADER_CONTENT_TYPE, "application/json")
-          .body(str)
-          .sendWithEOM();
+      sendJsonResponse(obj);
+
     });
   } else {
+    // nothing
   }
 
 }
 
-void RestDbRequestHandler::requestComplete()noexcept {
+void RestDbRequestHandler::requestComplete() noexcept {
   delete this;
 }
 

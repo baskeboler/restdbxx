@@ -11,6 +11,7 @@ class Validations {
  public:
   static bool is_valid_email(const std::string &email);
   static bool is_valid_path(const std::string &path);
+  static void sanitize_path(std::string &path);
 };
 
 }

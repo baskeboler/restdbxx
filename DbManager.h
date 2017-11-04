@@ -53,7 +53,7 @@ class DbManager {
   virtual ~DbManager();
 
   void save_user(folly::dynamic &userJson) {
-    this->post(USERS_CF, userJson);
+    if (!get_user(userJson["password"].asString())) this->post(USERS_CF, userJson);
   }
 
   folly::Optional<folly::dynamic> get_user(const std::string &username) {

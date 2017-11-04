@@ -5,7 +5,9 @@
 #ifndef RESTDBXX_RESTDBREQUESTHANDLER_H
 #define RESTDBXX_RESTDBREQUESTHANDLER_H
 #include <proxygen/httpserver/RequestHandler.h>
+#include <folly/dynamic.h>
 
+const std::string HTTP_MESSAGE_OK = "OK";
 namespace restdbxx {
 
 class RestDbRequestHandler: public proxygen::RequestHandler {
@@ -25,6 +27,9 @@ class RestDbRequestHandler: public proxygen::RequestHandler {
   std::string _path;
   bool not_found() const;
   bool is_endpoint_add = false;
+  void sendEmptyContentResponse(int status, const std::string &message) const;
+  void sendJsonResponse(const folly::dynamic &json, int status=200, const std::string &message=HTTP_MESSAGE_OK) const;
+  void sendStringResponse(const std::string &body, int status=200, const std::string &message=HTTP_MESSAGE_OK) const;
 };
 
 }

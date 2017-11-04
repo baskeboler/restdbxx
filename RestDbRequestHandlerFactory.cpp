@@ -19,7 +19,9 @@ void RestDbRequestHandlerFactory::onServerStop() noexcept {
 proxygen::RequestHandler *RestDbRequestHandlerFactory::onRequest(proxygen::RequestHandler *handler,
                                                                  proxygen::HTTPMessage *message) noexcept {
   proxygen::RequestHandler* resultHandler = nullptr;
-  if (Validations::is_valid_path(message->getPath())) {
+  std::string path = message->getPath();
+  Validations::sanitize_path(path);
+  if (Validations::is_valid_path(path)) {
     resultHandler = new RestDbRequestHandler();
 
   } else if (handler != nullptr) {

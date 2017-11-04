@@ -19,8 +19,17 @@ void UserRequestHandler::requestComplete() noexcept {
   delete this;
 }
 void UserRequestHandler::onEOM() noexcept {
+  if (_method == "POST" && _path == "/__users") {
 
+    std::string str;
+    auto copy = _body->cloneCoalescedAsValue();
+    auto obj = folly::parseJson(copy.moveToFbString().toStdString());
+    auto db = DbManager::get_instance();
+    db->post(_path, obj);
+    sendJsonResponse(obj, 201, "Created");
+  }
 }
+
 void UserRequestHandler::onBody(std::unique_ptr<folly::IOBuf> body) noexcept {
   if (_body) {
     _body->prependChain(std::move(body));
@@ -29,26 +38,19 @@ void UserRequestHandler::onBody(std::unique_ptr<folly::IOBuf> body) noexcept {
   }
 }
 void UserRequestHandler::onRequest(std::unique_ptr<proxygen::HTTPMessage> headers) noexcept {
-  VLOG(google::GLOG_INFO) << "baskeboler@gmail.com" << Validations::is_valid_email("baskeboler@gmail.com");
-
-  VLOG(google::GLOG_INFO) << "baskeboler@gmail.com*" << Validations::is_valid_email("baskeboler@gmail.com*");
-  auto m = headers->getMethodString();
-  auto path = headers->getPath();
-
-  if (m == "GET") {
+  _method = headers->getMethodString();
+  _path = headers->getPath();
+  Validations::sanitize_path(_path);
+  if (_method == "GET") {
     std::vector<std::string> parts;
-    boost::algorithm::split(parts, path, boost::is_any_of("/"), boost::algorithm::token_compress_on);
+    boost::algorithm::split(parts, _path, boost::is_any_of("/"), boost::algorithm::token_compress_on);
     auto i = parts.rbegin();
     if (i != parts.rend()) {
       std::string username = *i;
       auto db = DbManager::get_instance();
       auto result = db->get_user(username);
       if (result) {
-        ResponseBuilder(downstream_)
-            .status(200, "OK")
-            .header(proxygen::HTTPHeaderCode::HTTP_HEADER_CONTENT_TYPE, "application/json")
-            .body(folly::toPrettyJson(result.value()))
-            .sendWithEOM();
+        sendJsonResponse(result.value());
       } else {
         notFound();
       }
@@ -56,6 +58,13 @@ void UserRequestHandler::onRequest(std::unique_ptr<proxygen::HTTPMessage> header
       notFound();
     }
   }
+}
+void UserRequestHandler::sendJsonResponse(folly::dynamic &result, int status, const std::string &message) const {
+  ResponseBuilder(downstream_)
+            .status(status, message)
+            .header(proxygen::HTTP_HEADER_CONTENT_TYPE, "application/json")
+            .body(folly::toPrettyJson(result))
+            .sendWithEOM();
 }
 
 void UserRequestHandler::notFound() {

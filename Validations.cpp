@@ -4,7 +4,7 @@
 
 #include <boost/spirit/include/classic.hpp>
 #include "Validations.h"
-
+#include <boost/algorithm/string.hpp>
 namespace restdbxx {
 
 bool Validations::is_valid_path(const std::string &path) {
@@ -21,5 +21,11 @@ bool Validations::is_valid_email(const std::string &email) {
                             at_least_one_alphanumeric >> '@' >> +(at_least_one_alphanumeric >> '.')
                                                       >> at_least_one_alphanumeric);
   return parse_result.full;
+}
+void Validations::sanitize_path(std::string &path) {
+  bool endsWithSlash = boost::algorithm::ends_with(path, "/");
+  if (endsWithSlash) {
+    boost::algorithm::replace_last(path, "/", "");
+  }
 }
 }

@@ -6,6 +6,7 @@
 #define RESTDBXX_USERREQUESTHANDLER_H
 #include <proxygen/httpserver/RequestHandler.h>
 #include <boost/spirit/include/classic.hpp>
+#include <folly/dynamic.h>
 
 using proxygen::RequestHandler;
 using folly::IOBuf;
@@ -24,6 +25,9 @@ class UserRequestHandler : public RequestHandler {
  private :
   std::unique_ptr<IOBuf> _body;
   void notFound();
+  std::string _path;
+  std::string _method;
+  void sendJsonResponse(folly::dynamic &result, int status=200, const std::string &message="OK") const;
 };
 
 }
