@@ -3,6 +3,7 @@
 //
 
 #include "DbManager.h"
+#include "RestDbConfiguration.h"
 #include <folly/Singleton.h>
 namespace restdbxx {
 namespace {
@@ -17,6 +18,7 @@ DbManager::DbManager() : _root(folly::dynamic::object()) {
   using google::GLOG_ERROR;
   //_root.
   VLOG(GLOG_INFO) << "Initializing DbManager";
+  const auto &db_path = RestDbConfiguration::get_instance()->getDb_path();
   auto opts = rocksdb::Options();
   //auto dbOpts = rocksdb::DBOptions();
   opts.create_if_missing = true;
@@ -24,13 +26,13 @@ DbManager::DbManager() : _root(folly::dynamic::object()) {
   std::vector<std::string> cfs;
 
   rocksdb::DB *aux;
-  auto status = rocksdb::DB::Open(opts, "/tmp/restdb", &aux);
+  auto status = rocksdb::DB::Open(opts, db_path, &aux);
   if (!status.ok()) {
     VLOG(GLOG_ERROR) << status.ToString();
   }
   delete aux;
 
-  status = rocksdb::DB::ListColumnFamilies(opts, "/tmp/restdb", &cfs);
+  status = rocksdb::DB::ListColumnFamilies(opts, db_path, &cfs);
   if (!status.ok()) {
     VLOG(GLOG_ERROR) << status.ToString();
   }
@@ -39,7 +41,7 @@ DbManager::DbManager() : _root(folly::dynamic::object()) {
   for (const auto &n: cfs) {
     descrs.emplace_back(n, rocksdb::ColumnFamilyOptions());
   }
-  status = rocksdb::DB::Open(opts, "/tmp/restdb", descrs, &handles, &_db);
+  status = rocksdb::DB::Open(opts, db_path, descrs, &handles, &_db);
   if (!status.ok()) {
     LOG(ERROR) << status.ToString();
   }
@@ -251,8 +253,40 @@ folly::Optional<folly::dynamic> DbManager::get(const std::string path) const {
 
   return folly::none;
 }
-bool DbManager::is_endpoint(const std::string& path) const {
+bool DbManager::is_endpoint(const std::string &path) const {
   auto eps = get_endpoints();
   return std::find(eps.begin(), eps.end(), path) != eps.end();
+}
+folly::Optional<folly::dynamic> DbManager::get_user(const std::string &username) {
+  //auto j = folly::dynamic::object();
+  std::string value;
+  auto s = _db->NewIterator(rocksdb::ReadOptions(), cfh_map[USERS_CF]);
+  s->SeekToFirst();
+  while (s->Valid()) {
+    VLOG(google::GLOG_INFO) << "Iterating over users " << s->key().ToString() << "  --  " << s->value().ToString();
+    auto str = s->value();
+    auto obj = folly::parseJson(str.ToString());
+    if (obj.at("username").asString() == username) {
+      VLOG(google::GLOG_INFO) << "hay mas baratos! ";
+
+      return obj;
+    }
+    s->Next();
+  }
+  delete s;
+  return folly::none;
+}
+void DbManager::get_all(const std::string &path, std::vector<folly::dynamic> &result) {
+  auto s = _db->NewIterator(rocksdb::ReadOptions(), cfh_map[USERS_CF]);
+  s->SeekToFirst();
+  while (s->Valid()) {
+    VLOG(google::GLOG_INFO) << "Iterating over users " << s->key().ToString() << "  --  " << s->value().ToString();
+    auto str = s->value();
+    auto obj = folly::parseJson(str.ToString());
+    result.push_back(obj);
+    s->Next();
+  }
+  delete s;
+
 }
 }

@@ -7,12 +7,13 @@
 #include <proxygen/httpserver/RequestHandler.h>
 #include <boost/spirit/include/classic.hpp>
 #include <folly/dynamic.h>
+#include "BaseRequestHandler.h"
 
 using proxygen::RequestHandler;
 using folly::IOBuf;
 
 namespace restdbxx {
-class UserRequestHandler : public RequestHandler {
+class UserRequestHandler : public BaseRequestHandler {
  public:
   void onRequest(std::unique_ptr<proxygen::HTTPMessage> headers) noexcept override;
   void onBody(std::unique_ptr<folly::IOBuf> body) noexcept override;
@@ -23,11 +24,6 @@ class UserRequestHandler : public RequestHandler {
 
   virtual ~UserRequestHandler();
  private :
-  std::unique_ptr<IOBuf> _body;
-  void notFound();
-  std::string _path;
-  std::string _method;
-  void sendJsonResponse(folly::dynamic &result, int status=200, const std::string &message="OK") const;
 };
 
 }

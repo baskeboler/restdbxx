@@ -6,11 +6,12 @@
 #define RESTDBXX_RESTDBREQUESTHANDLER_H
 #include <proxygen/httpserver/RequestHandler.h>
 #include <folly/dynamic.h>
+#include "BaseRequestHandler.h"
 
 const std::string HTTP_MESSAGE_OK = "OK";
 namespace restdbxx {
 
-class RestDbRequestHandler: public proxygen::RequestHandler {
+class RestDbRequestHandler: public BaseRequestHandler {
  public:
   void onRequest(std::unique_ptr<proxygen::HTTPMessage> headers) noexcept override;
   void onBody(std::unique_ptr<folly::IOBuf> body) noexcept override;
@@ -21,16 +22,7 @@ class RestDbRequestHandler: public proxygen::RequestHandler {
 
 
  private:
-  std::unique_ptr<folly::IOBuf> _body;
-  std::unique_ptr<proxygen::HTTPMessage> _headers;
-  proxygen::HTTPMethod _method;
-  std::string _path;
-  bool not_found() const;
-  bool is_endpoint_add = false;
-  void sendEmptyContentResponse(int status, const std::string &message) const;
-  void sendJsonResponse(const folly::dynamic &json, int status=200, const std::string &message=HTTP_MESSAGE_OK) const;
-  void sendStringResponse(const std::string &body, int status=200, const std::string &message=HTTP_MESSAGE_OK) const;
-};
+  };
 
 }
 

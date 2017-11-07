@@ -67,30 +67,6 @@ void RestDbRequestHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexc
   }
 
 }
-void RestDbRequestHandler::sendStringResponse(const std::string &body, int status, const std::string &message) const {
-  ResponseBuilder(downstream_)
-      .status(500, "mayhem")
-      .body("dont delete root")
-      .sendWithEOM();
-}
-void RestDbRequestHandler::sendEmptyContentResponse(int status, const std::string &message) const {
-  ResponseBuilder(downstream_)
-      .status(status, message)
-      .sendWithEOM();
-}
-void RestDbRequestHandler::sendJsonResponse(const folly::dynamic &json, int status, const std::string &message) const {
-  auto jsonStr = toPrettyJson(json);
-  ResponseBuilder(downstream_)
-      .status(200, "OK")
-      .header(HTTP_HEADER_CONTENT_TYPE, "application/json")
-      .body(jsonStr.c_str())
-      .sendWithEOM();
-}
-bool RestDbRequestHandler::not_found() const {
-  auto db = DbManager::get_instance();
-  return (this->_method == HTTPMethod::GET || this->_method == HTTPMethod::PUT
-      || this->_method == HTTPMethod::DELETE) && !db->path_exists(this->_path);
-}
 
 void RestDbRequestHandler::onBody(std::unique_ptr<folly::IOBuf> body) noexcept {
   if (_body)

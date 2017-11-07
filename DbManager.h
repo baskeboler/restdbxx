@@ -56,25 +56,9 @@ class DbManager {
     if (!get_user(userJson["password"].asString())) this->post(USERS_CF, userJson);
   }
 
-  folly::Optional<folly::dynamic> get_user(const std::string &username) {
-    //auto j = folly::dynamic::object();
-    std::string value;
-    auto s = _db->NewIterator(rocksdb::ReadOptions(), cfh_map[USERS_CF]);
-    s->SeekToFirst();
-    while (s->Valid()) {
-      VLOG(google::GLOG_INFO) << "Iterating over users " << s->key().ToString() << "  --  " << s->value().ToString();
-      auto str = s->value();
-      auto obj = folly::parseJson(str.ToString());
-      if (obj.at("username").asString() == username) {
-        VLOG(google::GLOG_INFO) << "hay mas baratos! ";
+  folly::Optional<folly::dynamic> get_user(const std::string &username);
 
-        return obj;
-      }
-      s->Next();
-    }
-    delete s;
-    return folly::none;
-  }
+  void get_all(const std::string &path, std::vector<folly::dynamic> &result);
  private:
   rocksdb::DB *_db;
   folly::dynamic _root;
