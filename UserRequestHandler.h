@@ -15,6 +15,7 @@ using folly::IOBuf;
 namespace restdbxx {
 class UserRequestHandler : public BaseRequestHandler {
  public:
+  UserRequestHandler();
   void onRequest(std::unique_ptr<proxygen::HTTPMessage> headers) noexcept override;
   void onBody(std::unique_ptr<folly::IOBuf> body) noexcept override;
   void onEOM() noexcept override;
@@ -24,6 +25,7 @@ class UserRequestHandler : public BaseRequestHandler {
 
   virtual ~UserRequestHandler();
  private :
+  bool validateUser(folly::dynamic &aDynamic);
 };
 
 }

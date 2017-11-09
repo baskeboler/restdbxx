@@ -21,13 +21,22 @@ void UserRequestHandler::requestComplete() noexcept {
 }
 void UserRequestHandler::onEOM() noexcept {
   if (_method == proxygen::HTTPMethod::POST && _path == USERS_PATH) {
-
     std::string str;
     auto copy = _body->cloneCoalescedAsValue();
     auto obj = folly::parseJson(copy.moveToFbString().toStdString());
     auto db = DbManager::get_instance();
-    db->post(_path, obj);
-    sendJsonResponse(obj, 201, "Created");
+    bool valid = validateUser(obj);
+    auto maybeUser = valid ? db->get_user(obj["username"].asString()) : folly::none;
+    if (maybeUser) {
+      sendJsonResponse(folly::dynamic::object("error", true)
+                           ("message", "user with same username already exists"),
+                       403,
+                       "Conflict");
+    } else {
+
+      db->post(_path, obj);
+      sendJsonResponse(obj, 201, "Created");
+    }
   }
 }
 
@@ -74,7 +83,11 @@ void UserRequestHandler::onRequest(std::unique_ptr<proxygen::HTTPMessage> header
 void UserRequestHandler::onUpgrade(proxygen::UpgradeProtocol prot) noexcept {
   // ...
 }
-UserRequestHandler::~UserRequestHandler() {
-
+UserRequestHandler::~UserRequestHandler() = default;
+bool UserRequestHandler::validateUser(folly::dynamic &aDynamic) {
+  return aDynamic.isObject()
+      && !aDynamic.at("username").empty()
+      && !aDynamic.at("password").empty();
 }
+UserRequestHandler::UserRequestHandler(): {}
 }

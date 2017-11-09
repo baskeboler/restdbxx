@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.5)
 project(restdbxx)
 
 set(CMAKE_CXX_STANDARD 14)
-#set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_BUILD_TYPE Debug)
 
 set(BOOST_USE_STATIC_LIBS ON)
 set(BOOST_USE_MULTITHREADED ON)
@@ -64,7 +64,7 @@ set(SOURCE_FILES
         UserRequestHandler.h UserRequestHandlerFactory.cpp
         UserRequestHandlerFactory.h Validations.cpp
 
-        RestDbConfiguration.cpp includes.h BaseRequestHandler.cpp BaseRequestHandler.h)
+        RestDbConfiguration.cpp includes.h BaseRequestHandler.cpp BaseRequestHandler.h CorsFilter.cpp CorsFilter.h EndpointDescriptor.cpp EndpointDescriptor.h)
 add_executable(restdbxx ${SOURCE_FILES})
 
 target_link_libraries(restdbxx ${LIBS})

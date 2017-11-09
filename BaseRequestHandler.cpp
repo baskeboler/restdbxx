@@ -21,16 +21,18 @@ void BaseRequestHandler::sendEmptyContentResponse(int status, const std::string 
 void BaseRequestHandler::sendJsonResponse(const folly::dynamic &json, int status, const std::string &message) const {
   auto jsonStr = toPrettyJson(json);
   proxygen::ResponseBuilder(downstream_)
-      .status(200, "OK")
+      .status(status, message)
       .header(proxygen::HTTP_HEADER_CONTENT_TYPE, "application/json")
+      .header(proxygen::HTTP_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN, "*")
       .body(jsonStr.c_str())
       .sendWithEOM();
 
 }
 void BaseRequestHandler::sendStringResponse(const std::string &body, int status, const std::string &message) const {
   proxygen::ResponseBuilder(downstream_)
-      .status(500, "mayhem")
+      .status(status, message)
       .body("dont delete root")
       .sendWithEOM();
 }
+BaseRequestHandler::BaseRequestHandler(): RequestHandler() {}
 }

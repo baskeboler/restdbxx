@@ -38,7 +38,11 @@ void RestDbRequestHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexc
         sendStringResponse(INDEX_BODY);
         return;
       }
-
+      if (db->is_endpoint(_path)) {
+        std::vector<folly::dynamic> all;
+        db->get_all(_path, all);
+        sendJsonResponse(folly::dynamic::array(all));
+      }
       folly::try_and_catch<std::exception, std::runtime_error>([&]() {
         auto json = *db->get(_path);
         sendJsonResponse(json);
@@ -118,4 +122,5 @@ void RestDbRequestHandler::onError(ProxygenError err) noexcept {
 void RestDbRequestHandler::onUpgrade(proxygen::UpgradeProtocol prot)noexcept {
 
 }
+RestDbRequestHandler::RestDbRequestHandler(): BaseRequestHandler() {}
 }

@@ -2,18 +2,18 @@
 // Created by victor on 4/11/17.
 //
 
+#include <boost/algorithm/string.hpp>
+#include <proxygen/httpserver/filters/DirectResponseHandler.h>
 #include "UserRequestHandlerFactory.h"
 #include "UserRequestHandler.h"
 #include "LoggingFilter.h"
 #include "Validations.h"
-#include <boost/algorithm/string.hpp>
-#include <proxygen/httpserver/filters/DirectResponseHandler.h>
+#include "CorsFilter.h"
+
 namespace restdbxx {
 
 const std::string USERS_PATH = "/__users";
-const std::string LALA = "";
 void UserRequestHandlerFactory::onServerStart(folly::EventBase *evb) noexcept {
-
   VLOG(google::GLOG_INFO) << "starting server ";
 }
 void UserRequestHandlerFactory::onServerStop() noexcept {
@@ -27,16 +27,14 @@ proxygen::RequestHandler *UserRequestHandlerFactory::onRequest(proxygen::Request
   bool result = boost::algorithm::starts_with(path, USERS_PATH);
   if (result) {
     VLOG(google::GLOG_INFO) << "path matches, handling this request with UserRequestHandler";
-    auto filter = new LoggingFilter(new UserRequestHandler());
+    auto filter = new LoggingFilter(
+        new CorsFilter(
+            new UserRequestHandler()));
     return filter;
-  } else if (handler == nullptr) {
-    auto filter = new LoggingFilter(new proxygen::DirectResponseHandler(404, "Not Found", "whatevah"));
-
-    //return new proxygen::DirectResponseHandler(404,  "not found", "");
   }
 
   VLOG(google::GLOG_INFO) << "path doesnt match";
-  return new LoggingFilter(handler);
+  return new LoggingFilter(new CorsFilter(handler));
 }
 UserRequestHandlerFactory::~UserRequestHandlerFactory() {
 

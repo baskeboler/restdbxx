@@ -4,22 +4,21 @@
 
 #ifndef RESTDBXX_DBMANAGER_H
 #define RESTDBXX_DBMANAGER_H
-#include <string>
+
+#include  <string>
 #include <vector>
 #include <memory>
 #include <boost/algorithm/string.hpp>
 //#include <rocksdb/utilities/optimistic_transaction_db.h>
-#include <folly/ExceptionWrapper.h>
+#include  <folly/ExceptionWrapper.h>
 #include <folly/dynamic.h>
 #include <folly/Optional.h>
-#include <rocksdb/db.h>
+#include <rocksdb/utilities/transaction_db.h>
 #include <folly/json.h>
 #include <glog/logging.h>
 #include <glog/stl_logging.h>
 
 namespace restdbxx {
-
-static const char *USERS_CF = "/__users";
 
 class DbManager {
  public:;
@@ -37,8 +36,8 @@ class DbManager {
    * @param path path to post to
    * @param data json object
    */
-  void post(const std::string path, folly::dynamic &data);
-  void put(const std::string path, const folly::dynamic &data);
+  void post(std::string path, folly::dynamic &data);
+  void put(std::string path, const folly::dynamic &data);
 
   folly::Optional<folly::dynamic> get(const std::string path) const;
   void remove(const std::string path);
@@ -52,19 +51,21 @@ class DbManager {
   static std::shared_ptr<DbManager> get_instance();
   virtual ~DbManager();
 
-  void save_user(folly::dynamic &userJson) {
+  /*void save_user(folly::dynamic &userJson) {
     if (!get_user(userJson["password"].asString())) this->post(USERS_CF, userJson);
-  }
+  }*/
 
   folly::Optional<folly::dynamic> get_user(const std::string &username);
 
   void get_all(const std::string &path, std::vector<folly::dynamic> &result);
  private:
-  rocksdb::DB *_db;
-  folly::dynamic _root;
+  std::unique_ptr<rocksdb::TransactionDB> _db;
   std::vector<std::string> get_path_parts(std::string path) const;
-  std::vector<rocksdb::ColumnFamilyHandle *> handles;
-  std::map<std::string, rocksdb::ColumnFamilyHandle *> cfh_map;
+  std::vector<rocksdb::ColumnFamilyHandle *> _handles;
+  std::map<std::string, rocksdb::ColumnFamilyHandle *> _cfh_map;
+  int get_endpoint_count_and_increment(const std::string pTransaction, rocksdb::Transaction *pTransaction1);
+  void perform_database_init_tasks();
+  bool is_initialized();
 };
 
 }
