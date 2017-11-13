@@ -3,7 +3,7 @@ project(restdbxx)
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_BUILD_TYPE Debug)
-
+set(CMAKE_CXX_FLAGS -Wall)
 set(BOOST_USE_STATIC_LIBS ON)
 set(BOOST_USE_MULTITHREADED ON)
 set(BOOST_USE_STATIC_RUNTIME OFF)
@@ -64,7 +64,7 @@ set(SOURCE_FILES
         UserRequestHandler.h UserRequestHandlerFactory.cpp
         UserRequestHandlerFactory.h Validations.cpp
 
-        RestDbConfiguration.cpp includes.h BaseRequestHandler.cpp BaseRequestHandler.h CorsFilter.cpp CorsFilter.h EndpointDescriptor.cpp EndpointDescriptor.h)
+        RestDbConfiguration.cpp includes.h BaseRequestHandler.cpp BaseRequestHandler.h CorsFilter.cpp CorsFilter.h EndpointDescriptor.cpp EndpointDescriptor.h EndpointController.cpp EndpointController.h EndpointControllerFactory.cpp EndpointControllerFactory.h FiltersFactory.cpp FiltersFactory.h)
 add_executable(restdbxx ${SOURCE_FILES})
 
 target_link_libraries(restdbxx ${LIBS})

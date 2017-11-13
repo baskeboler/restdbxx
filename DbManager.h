@@ -42,8 +42,8 @@ class DbManager {
   folly::Optional<folly::dynamic> get(const std::string path) const;
   void remove(const std::string path);
 
-  void add_endpoint(const std::string path);
-
+  void add_endpoint(const std::string &path);
+  folly::dynamic get_endpoint(const std::string &path) const;
 
   std::vector<std::string> get_endpoints() const;
   bool is_endpoint(const std::string& path) const;

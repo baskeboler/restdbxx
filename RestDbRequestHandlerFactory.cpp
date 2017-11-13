@@ -26,18 +26,15 @@ proxygen::RequestHandler *RestDbRequestHandlerFactory::onRequest(proxygen::Reque
   proxygen::RequestHandler *resultHandler = nullptr;
   std::string path = message->getPath();
   Validations::sanitize_path(path);
-  auto withFilter = [](auto handler) {
-    return new LoggingFilter(new CorsFilter(handler));
-  };
   if (Validations::is_valid_path(path)) {
 
     VLOG(google::GLOG_INFO) << "el path es valido ";
-    resultHandler = withFilter(new RestDbRequestHandler());
+    resultHandler = new RestDbRequestHandler();
 
   } else if (handler != nullptr) {
     VLOG(google::GLOG_WARNING) << "el path no es valido, pasando el control al siguiente handler";
 
-    resultHandler = withFilter(handler);
+    resultHandler = handler;
 
   } else {
     VLOG(google::GLOG_WARNING) << "el path no es valido ";

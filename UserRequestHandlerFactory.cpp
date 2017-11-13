@@ -27,14 +27,11 @@ proxygen::RequestHandler *UserRequestHandlerFactory::onRequest(proxygen::Request
   bool result = boost::algorithm::starts_with(path, USERS_PATH);
   if (result) {
     VLOG(google::GLOG_INFO) << "path matches, handling this request with UserRequestHandler";
-    auto filter = new LoggingFilter(
-        new CorsFilter(
-            new UserRequestHandler()));
-    return filter;
+    return new UserRequestHandler();
   }
 
   VLOG(google::GLOG_INFO) << "path doesnt match";
-  return new LoggingFilter(new CorsFilter(handler));
+  return handler;
 }
 UserRequestHandlerFactory::~UserRequestHandlerFactory() {
 

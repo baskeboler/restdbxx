@@ -89,5 +89,5 @@ bool UserRequestHandler::validateUser(folly::dynamic &aDynamic) {
       && !aDynamic.at("username").empty()
       && !aDynamic.at("password").empty();
 }
-UserRequestHandler::UserRequestHandler(): {}
+UserRequestHandler::UserRequestHandler() = default;
 }

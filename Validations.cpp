@@ -13,8 +13,8 @@ bool Validations::is_valid_path(const std::string &path) {
   using boost::spirit::classic::strlit;
   auto one_or_more_alpha_numeric = +alpha_p >> *(alpha_p | digit_p | punct_p);
   auto alphanumeric_path = chlit<char>('/') >> *(one_or_more_alpha_numeric >> *(chlit<char>('/')));
-  auto paths_validos = (strlit<const char*>("/__endpoints") | alphanumeric_path );
-  return parse(path.c_str(), paths_validos
+  //auto paths_validos = (strlit<const char*>("/__endpoints") | alphanumeric_path );
+  return parse(path.c_str(), alphanumeric_path
                ).full;
 }
 

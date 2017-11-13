@@ -12,11 +12,11 @@ void CorsFilter::onRequest(std::unique_ptr<proxygen::HTTPMessage> headers) noexc
   if (exists) {
     _origin = headers->getHeaders().getSingleOrEmpty(proxygen::HTTPHeaderCode::HTTP_HEADER_ORIGIN);
   }
-  proxygen::Filter::onRequest(std::move(headers));
+  upstream_->onRequest(std::move(headers));
 }
 void CorsFilter::sendHeaders(proxygen::HTTPMessage &msg) noexcept {
   msg.getHeaders().set(proxygen::HTTPHeaderCode::HTTP_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN, _origin);
-  proxygen::Filter::sendHeaders(msg);
+  downstream_->sendHeaders(msg);
 }
 CorsFilter::~CorsFilter() = default;
 

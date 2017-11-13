@@ -7,6 +7,8 @@
 #include <folly/io/async/EventBaseManager.h>
 #include <proxygen/httpserver/HTTPServer.h>
 #include "includes.h"
+#include "EndpointControllerFactory.h"
+#include "FiltersFactory.h"
 
 using proxygen::HTTPServer;
 
@@ -24,7 +26,7 @@ DEFINE_int32(http_port, 11000, "Port to listen on with HTTP protocol");
 DEFINE_int32(spdy_port, 11001, "Port to listen on with SPDY protocol");
 DEFINE_int32(h2_port, 11002, "Port to listen on with HTTP/2 protocol");
 DEFINE_string(ip, "localhost", "IP/Hostname to bind to");
-DEFINE_int32(threads, 0, "Number of threads to listen on. Numbers <= 0 "
+DEFINE_int32(threads, 16, "Number of threads to listen on. Numbers <= 0 "
     "will use the number of cores on this machine.");
 DEFINE_string(db_path, "/tmp/restdb", "Path to the database");
 
@@ -58,6 +60,8 @@ int main(int argc, char **argv) {
   options.shutdownOn = {SIGINT, SIGTERM};
   options.enableContentCompression = false;
   options.handlerFactories = RequestHandlerChain()
+      //.addThen<restdbxx::FiltersFactory>()
+      .addThen<restdbxx::EndpointControllerFactory>()
       .addThen<restdbxx::UserRequestHandlerFactory>()
       .addThen<restdbxx::RestDbRequestHandlerFactory>()
       .build();

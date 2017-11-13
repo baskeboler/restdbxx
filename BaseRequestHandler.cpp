@@ -34,5 +34,7 @@ void BaseRequestHandler::sendStringResponse(const std::string &body, int status,
       .body("dont delete root")
       .sendWithEOM();
 }
-BaseRequestHandler::BaseRequestHandler(): RequestHandler() {}
+BaseRequestHandler::BaseRequestHandler(): RequestHandler(){
+
+}
 }

@@ -31,7 +31,7 @@ void RestDbRequestHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexc
   //auto p = headers->getPath();
   if (headers->getHeaders().exists("RESTDBXX_ADD_ENDPOINT"))
     is_endpoint_add = true;
-
+  folly::dynamic json;
   switch (_method) {
     case HTTPMethod::GET:
       if (_path == "") {
@@ -42,12 +42,11 @@ void RestDbRequestHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexc
         std::vector<folly::dynamic> all;
         db->get_all(_path, all);
         sendJsonResponse(folly::dynamic::array(all));
+        return;
       }
-      folly::try_and_catch<std::exception, std::runtime_error>([&]() {
-        auto json = *db->get(_path);
-        sendJsonResponse(json);
-      });
-      break;
+      json = db->get(_path).value();
+      sendJsonResponse(json);
+      return;
     case HTTPMethod::POST:break;
     case HTTPMethod::PUT:break;
     case HTTPMethod::DELETE:
@@ -56,13 +55,20 @@ void RestDbRequestHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexc
         return;
       }
 
-      folly::try_and_catch<std::exception, std::runtime_error>([&]() {
-        db->remove(_path);
+      db->remove(_path);
 
-        sendEmptyContentResponse(200, "OK");
-      });
+      sendEmptyContentResponse(200, "OK");
+      return;
       break;
-    default: break;
+    case HTTPMethod::OPTIONS:
+    case HTTPMethod::HEAD:
+    case HTTPMethod::CONNECT:
+    case HTTPMethod::TRACE:
+    case HTTPMethod::PATCH:
+      //default:
+      sendEmptyContentResponse(500, "Unhandled request");
+      return;
+      break;
   }
 
   if (not_found()) {
@@ -82,30 +88,29 @@ void RestDbRequestHandler::onBody(std::unique_ptr<folly::IOBuf> body) noexcept {
 void RestDbRequestHandler::onEOM() noexcept {
 
   if (_method == HTTPMethod::POST) {
+    if (!_body) {
+      sendStringResponse("Cannot post empty body", 500, "Error");
+      return;
+    }
 
-    folly::try_and_catch<std::exception, std::runtime_error>([&]() {
+    //folly::StringPiece s(_body->buffer(), _body->length());
 
-      //folly::StringPiece s(_body->buffer(), _body->length());
-
-      std::string str;
-      auto copy = _body->cloneCoalescedAsValue();
-      auto obj = folly::parseJson(copy.moveToFbString().toStdString());
-      auto db = DbManager::get_instance();
-      db->post(_path, obj);
-      sendJsonResponse(obj, 201, "Created");
-
-    });
+    std::string str;
+    //auto copy = _body->cloneCoalescedAsValue();
+    auto obj = folly::parseJson(_body->moveToFbString().toStdString());
+    auto db = DbManager::get_instance();
+    db->post(_path, obj);
+    sendJsonResponse(obj, 201, "Created");
+    return;
   } else if (_method == HTTPMethod::PUT) {
-    folly::try_and_catch<std::exception, std::runtime_error>([&]() {
 
-      std::string str;
-      auto copy = _body->cloneCoalescedAsValue();
-      auto obj = folly::parseJson(copy.moveToFbString().toStdString());
-      auto db = DbManager::get_instance();
-      db->put(_path, obj);
-      sendJsonResponse(obj);
-
-    });
+    std::string str;
+    auto copy = _body->cloneCoalescedAsValue();
+    auto obj = folly::parseJson(copy.moveToFbString().toStdString());
+    auto db = DbManager::get_instance();
+    db->put(_path, obj);
+    sendJsonResponse(obj);
+    return;
   } else {
     // nothing
   }
@@ -122,5 +127,6 @@ void RestDbRequestHandler::onError(ProxygenError err) noexcept {
 void RestDbRequestHandler::onUpgrade(proxygen::UpgradeProtocol prot)noexcept {
 
 }
-RestDbRequestHandler::RestDbRequestHandler(): BaseRequestHandler() {}
+RestDbRequestHandler::RestDbRequestHandler() : BaseRequestHandler() {}
+
 }

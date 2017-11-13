@@ -35,7 +35,11 @@ class BaseRequestHandler: public proxygen::RequestHandler {
   proxygen::HTTPMethod _method;
   std::string _path;
   virtual bool not_found() const;
-
+  folly::dynamic parseBody() const {
+    if (_body)
+      return folly::parseJson(_body->moveToFbString().toStdString());
+    return nullptr;
+  }
    bool is_endpoint_add = false;
 
   virtual void sendEmptyContentResponse(int status, const std::string &message) const;

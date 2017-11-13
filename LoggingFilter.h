@@ -16,7 +16,7 @@ class LoggingFilter : public proxygen::Filter{
   void sendBody(std::unique_ptr<folly::IOBuf> body) noexcept override;
   void onEgressPaused() noexcept override;
   void onEgressResumed() noexcept override;
-
+  virtual ~LoggingFilter();
 };
 
 
