@@ -23,11 +23,7 @@ struct AccessToken {
   std::string token;
   boost::posix_time::ptime valid_until;
 
-  folly::dynamic toDynamic() {
-    return folly::dynamic::object("username", username)
-        ("token", token)
-        ("valid_until", boost::posix_time::to_iso_string(valid_until));
-  }
+  folly::dynamic toDynamic();
 
   static std::unique_ptr<AccessToken> fromDynamic(folly::dynamic &json);
 };
@@ -37,70 +33,15 @@ class UserManager {
  public:
   static shared_ptr<UserManager> get_instance();
 
-  std::unique_ptr<User> create_user(const std::string &username, const std::string &password) {
-    auto user = std::make_unique<User>();
-    user->setUsername(username);
-    folly::StringPiece bytes = password;
-    user->setPassword(md5Encode(bytes));
-    user->setIs_active(true);
-
-    auto db = DbManager::get_instance();
-    auto json = user->toDynamic();
-    db->post("/__users", json);
-    return user;
-  }
+  std::unique_ptr<User> create_user(const std::string &username, const std::string &password);
   bool authenticate(string username, string password) const;
 
-  bool user_exists(string username) const {
-    auto db = DbManager::get_instance();
-    auto maybe_user = db->get_user(username);
-    return maybe_user.hasValue();
-  }
+  bool user_exists(string username) const;
 
-  std::unique_ptr<AccessToken> get_access_token(const string &username) {
-    auto token = createToken(username);
-    auto db = DbManager::get_instance();
-    auto user = db->get_user(username);
-    auto json = token->toDynamic();
-    string key = "/__tokens/" + token->token;
-    db->raw_save(key, json, "/__tokens");
-    return token;
-  }
-  std::unique_ptr<AccessToken> createToken(const string &username) {
-    auto res = std::make_unique<AccessToken>();
-    res->username = username;
-    res->valid_until = boost::posix_time::second_clock::universal_time() + boost::posix_time::minutes(5);
-    char randomData[16];
-    folly::Random::secureRandom(randomData, 16);
-    res->token = proxygen::base64Encode(folly::range(randomData, randomData + 16));
-//      folly::
-    //boost::local_time::local_date_time v(boost::posix_time::;
-    return res;
-  }
+  std::unique_ptr<AccessToken> get_access_token(const string &username);
+  std::unique_ptr<AccessToken> createToken(const string &username);
 
-  bool validate_access_token(const string &username, const string &token) {
-    string tokenPath = "/__tokens/" + token;
-    auto db = DbManager::get_instance();
-    auto tokenObj = db->raw_get(tokenPath, "/__tokens");
-    if (tokenObj) {
-      if (tokenObj->isObject()) {
-        try {
-          auto token_obj = AccessToken::fromDynamic(tokenObj.value());
-          bool expired = token_obj->valid_until < boost::posix_time::second_clock::universal_time();
-          if (expired) {
-            VLOG(google::GLOG_INFO) << "token has expired";
-            return false;
-          }
-          return token_obj->username == username;
-        } catch (std::domain_error &e) {
-          VLOG(google::GLOG_INFO) << "could not get token: " << e.what();
-          return false;
-        }
-      }
-      return false;
-    }
-    return false;
-  }
+  bool validate_access_token(const string &username, const string &token);
 };
 
 }

@@ -35,7 +35,8 @@ void AuthenticationFilter::onRequest(std::unique_ptr<proxygen::HTTPMessage> head
       VLOG(google::GLOG_INFO) << "token is valid, proceed";
     }
   }
-  proxygen::Filter::onRequest(std::move(headers));
+  if (upstream_)
+    upstream_->onRequest(std::move(headers));
 }
 
 AuthenticationFilter::AuthenticationFilter(proxygen::RequestHandler *upstream) : Filter(upstream) {}
@@ -69,6 +70,21 @@ void AuthenticationFilter::onEgressPaused() noexcept {
 void AuthenticationFilter::onEgressResumed() noexcept {
   if (upstream_) {
     upstream_->onEgressResumed();
+  }
+}
+void AuthenticationFilter::onBody(std::unique_ptr<folly::IOBuf> body) noexcept {
+  if (upstream_) {
+    upstream_->onBody(std::move(body));
+  }
+}
+void AuthenticationFilter::onUpgrade(proxygen::UpgradeProtocol protocol)noexcept {
+  if (upstream_) {
+    upstream_->onUpgrade(protocol);
+  }
+}
+void AuthenticationFilter::onEOM() noexcept {
+  if (upstream_) {
+    upstream_->onEOM();
   }
 }
 }

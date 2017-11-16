@@ -8,6 +8,8 @@
 #include <folly/json.h>
 #include <folly/ExceptionWrapper.h>
 #include <proxygen/httpserver/ResponseBuilder.h>
+#include <folly/io/async/EventBaseManager.h>
+#include <folly/futures/Promise.h>
 namespace restdbxx {
 using namespace proxygen;
 
@@ -39,9 +41,9 @@ void RestDbRequestHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexc
         return;
       }
       if (db->is_endpoint(_path)) {
-        std::vector<folly::dynamic> all;
-        db->get_all(_path, all);
-        sendJsonResponse(folly::dynamic::array(all));
+        getListingFuture().then([this](std::vector<folly::dynamic> &all) {
+          sendJsonResponse(folly::dynamic::array(all));
+        });
         return;
       }
       json = db->get(_path).value();
@@ -76,6 +78,17 @@ void RestDbRequestHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexc
 
   }
 
+}
+folly::Future<std::vector<folly::dynamic>> RestDbRequestHandler::getListingFuture() const {
+  folly::Promise<std::vector<folly::dynamic>> promise;
+  auto future = promise.getFuture();
+  folly::EventBaseManager::get()->getEventBase()->runInLoop([p = move(promise), this]() mutable {
+    auto db = DbManager::get_instance();
+    std::vector<folly::dynamic> all;
+    db->get_all(_path, all);
+    p.setValue(all);
+  });
+  return future;
 }
 
 void RestDbRequestHandler::onBody(std::unique_ptr<folly::IOBuf> body) noexcept {

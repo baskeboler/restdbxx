@@ -9,6 +9,13 @@ namespace restdbxx {
 
 void AuthenticationRequestHandler::onRequest(std::unique_ptr<proxygen::HTTPMessage> headers) noexcept {
 
+  if (headers->getMethodString() == "OPTIONS") {
+    proxygen::ResponseBuilder(downstream_)
+        .status(200, "OK")
+        .header(proxygen::HTTPHeaderCode::HTTP_HEADER_ALLOW, "POST, OPTIONS")
+        .sendWithEOM();
+    return;
+  }
   if (headers->getPath() != "/authenticate" || headers->getMethodString() != "POST") {
     sendStringResponse("invalid request", 400, "Bad Request");
   }
@@ -16,7 +23,7 @@ void AuthenticationRequestHandler::onRequest(std::unique_ptr<proxygen::HTTPMessa
 
 void AuthenticationRequestHandler::onBody(std::unique_ptr<folly::IOBuf> body) noexcept {
   if (_body) {
-    _body->appendChain(std::move(body));
+    _body->prependChain(std::move(body));
   } else {
     _body = std::move(body);
   }

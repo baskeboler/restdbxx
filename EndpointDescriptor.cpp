@@ -81,4 +81,13 @@ std::shared_ptr<EndpointDescriptor> EndpointDescriptor::fromDynamic(folly::dynam
     BOOST_THROW_EXCEPTION(std::invalid_argument("not a json object"));
   }
 }
+folly::dynamic EndpointDescriptor::getDynamic() const {
+  return folly::dynamic::object("id", id)
+      ("url", url)
+      ("count", count)
+      ("created", to_iso_extended_string(created))
+      ("modified", to_iso_extended_string(modified))
+      ("modification_user", modification_user)
+      ("enabled", enabled);
+}
 }

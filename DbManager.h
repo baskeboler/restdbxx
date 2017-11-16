@@ -33,24 +33,10 @@ class DbManager {
 
   void raw_save(const std::string &key,
                 folly::dynamic &data,
-                const std::string &cf_name = rocksdb::kDefaultColumnFamilyName) {
-
-    auto s = _db->Put(rocksdb::WriteOptions(), _cfh_map.at(cf_name), key, folly::toPrettyJson(data));
-    if (!s.ok()) {
-      VLOG(google::GLOG_INFO) << "error saving token: " << s.ToString();
-    }
-  }
+                const std::string &cf_name = rocksdb::kDefaultColumnFamilyName);
 
   folly::Optional<folly::dynamic> raw_get(const std::string &key,
-                                          const std::string &cf_name = rocksdb::kDefaultColumnFamilyName) {
-    std::string value;
-    auto s = _db->Get(rocksdb::ReadOptions(), _cfh_map.at(cf_name), key, &value);
-    if (!s.ok()) {
-      VLOG(google::GLOG_INFO) << s.ToString();
-      return folly::none;
-    }
-    return folly::parseJson(value);
-  }
+                                          const std::string &cf_name = rocksdb::kDefaultColumnFamilyName);
   /**
    * @brief will add ID property to data
    * @param path path to post to

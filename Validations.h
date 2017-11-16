@@ -5,7 +5,7 @@
 #ifndef RESTDBXX_VALIDATIONS_H
 #define RESTDBXX_VALIDATIONS_H
 #include <string>
-
+#include <boost/algorithm/string.hpp>
 namespace restdbxx {
 class Validations {
  public:
@@ -28,6 +28,16 @@ class Validations {
    * @param path
    */
   static void sanitize_path(std::string &path);
+
+  static std::string get_endpoint_from_path(const std::string &path) {
+    std::vector<std::string> parts;
+    boost::algorithm::split(parts, path, boost::is_any_of("/"), boost::token_compress_on);
+    if (parts.empty()) {
+      return "/";
+    } else {
+      return "/" + parts[0];
+    }
+  }
 };
 
 }

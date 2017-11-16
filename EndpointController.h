@@ -18,6 +18,7 @@ class EndpointController : public BaseRequestHandler {
 
   static const std::string &ENDPOINTS_PATH();
   void processPost();
+  folly::dynamic get_endpoints_dynamic() const;
 };
 
 }

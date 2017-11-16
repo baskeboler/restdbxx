@@ -31,9 +31,10 @@ void UserRequestHandler::onEOM() noexcept {
                        403,
                        "Conflict");
     } else {
-
-      db->post(_path, obj);
-      sendJsonResponse(obj, 201, "Created");
+      auto user_manager = UserManager::get_instance();
+      auto user = user_manager->create_user(obj.at("username").asString(), obj.at("password").asString());
+      //db->post(_path, obj);
+      sendJsonResponse(user->toDynamic(), 201, "Created");
     }
   }
 }

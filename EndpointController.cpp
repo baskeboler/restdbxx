@@ -2,6 +2,8 @@
 // Created by victor on 11/11/17.
 //
 
+#include <folly/futures/Promise.h>
+#include <folly/io/async/EventBaseManager.h>
 #include "EndpointController.h"
 #include "Validations.h"
 
@@ -15,16 +17,28 @@ void EndpointController::onRequest(std::unique_ptr<proxygen::HTTPMessage> header
   switch (_method) {
     case proxygen::HTTPMethod::GET:
       if (_path == ENDPOINTS_PATH()) {
-        auto db = DbManager::get_instance();
-        std::vector<folly::dynamic> endpoint_descrs;
-        db->get_all(ENDPOINTS_PATH(), endpoint_descrs);
-        folly::dynamic result = folly::dynamic::array(endpoint_descrs);
-        sendJsonResponse(result);
+        folly::Promise<folly::dynamic> p;
+        auto future = p.getFuture();
+        folly::EventBaseManager::get()->getEventBase()->runInLoop([p = std::move(p), this]() mutable {
+          p.setValue(get_endpoints_dynamic());
+        });
+        future.then([this](folly::dynamic &result) {
+          sendJsonResponse(result);
+
+        });
+        return;
       }
       break;
     default:sendEmptyContentResponse(500, "internal error");
   }
 
+}
+folly::dynamic EndpointController::get_endpoints_dynamic() const {
+  auto db = DbManager::get_instance();
+  std::vector<folly::dynamic> endpoint_descrs;
+  db->get_all(ENDPOINTS_PATH(), endpoint_descrs);
+  folly::dynamic result = folly::dynamic::array(endpoint_descrs);
+  return result;
 }
 void EndpointController::onBody(std::unique_ptr<folly::IOBuf> body) noexcept {
   if (_body) {

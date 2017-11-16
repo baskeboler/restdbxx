@@ -6,6 +6,7 @@
 #define RESTDBXX_RESTDBREQUESTHANDLER_H
 #include <proxygen/httpserver/RequestHandler.h>
 #include <folly/dynamic.h>
+#include <folly/futures/Future.h>
 #include "BaseRequestHandler.h"
 
 const std::string HTTP_MESSAGE_OK = "OK";
@@ -23,7 +24,8 @@ class RestDbRequestHandler: public BaseRequestHandler {
 
 
  private:
-  };
+  folly::Future<std::vector<folly::dynamic>> getListingFuture() const;
+};
 
 }
 

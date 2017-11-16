@@ -40,15 +40,7 @@ class EndpointDescriptor {
   bool isEnabled() const;
   void setEnabled(bool enabled);
 
-  folly::dynamic getDynamic() const {
-    return folly::dynamic::object("id", id)
-        ("url", url)
-        ("count", count)
-        ("created", to_iso_extended_string(created))
-        ("modified", to_iso_extended_string(modified))
-        ("modification_user", modification_user)
-        ("enabled", enabled);
-  }
+  folly::dynamic getDynamic() const;
   static std::shared_ptr<EndpointDescriptor> new_endpoint(long id, const std::string &url, const std::string &user);
   static std::shared_ptr<EndpointDescriptor> fromDynamic(folly::dynamic &obj);
 
