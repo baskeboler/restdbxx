@@ -25,7 +25,27 @@ the following libs should be compiled in this order:
   + get list of users
   + get specific user, for example /__users/username
 + /__endpoints
+  + GET will return a list of endpoint descriptors
+  + POST will register a new endpoint, for now the following json body is valid:
+    ```json 
+    {
+        "url": "/new_endpoint" 
+    }
+    ```
+    + more properties in the future.
 + /authenticate
+  + POST json like
+    ```json
+    {
+        "username": "some_user",
+        "password": "somepassword"
+    }
+    ```
+    + if successful, the service will return a json object with an access token.
+    + for protected requests, include the following headers
+      + RESTDBXX_AUTH_TOKEN with provided access token string
+      + RESTDBXX_AUTH_USERNAME with username
+      + if valid, request will proceed, otherwise it will be rejected.
 + /test_endpoint
 
 ## implementation notes
