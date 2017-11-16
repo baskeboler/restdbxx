@@ -38,4 +38,19 @@ bool UserManager::authenticate(string username, string password) const {
   }
   return false;
 }
+std::unique_ptr<AccessToken> AccessToken::fromDynamic(folly::dynamic &json) {
+  auto res = new AccessToken;
+  if (!json.isObject())
+    BOOST_THROW_EXCEPTION(std::domain_error("invalid access token object"));
+  if (!json.at("username").isString())
+    BOOST_THROW_EXCEPTION(std::domain_error("access token without username"));
+  if (!json.at("token").isString())
+    BOOST_THROW_EXCEPTION(std::domain_error("access token without token string"));
+  if (!json.at("valid_until").isString())
+    BOOST_THROW_EXCEPTION(std::domain_error("access token without username"));
+  res->username = string(json.at("username").c_str());
+  res->token = string(json.at("token").c_str());
+  res->valid_until = boost::posix_time::from_iso_string(string(json.at("valid_until").c_str()));
+  return std::unique_ptr<AccessToken>(res);
+}
 }

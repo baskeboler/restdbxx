@@ -21,9 +21,7 @@ void UserRequestHandler::requestComplete() noexcept {
 }
 void UserRequestHandler::onEOM() noexcept {
   if (_method == proxygen::HTTPMethod::POST && _path == USERS_PATH) {
-    std::string str;
-    auto copy = _body->cloneCoalescedAsValue();
-    auto obj = folly::parseJson(copy.moveToFbString().toStdString());
+    auto obj = parseBody();
     auto db = DbManager::get_instance();
     bool valid = validateUser(obj);
     auto maybeUser = valid ? db->get_user(obj["username"].asString()) : folly::none;

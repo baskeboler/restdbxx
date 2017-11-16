@@ -5,6 +5,7 @@
 #include "FiltersFactory.h"
 #include "LoggingFilter.h"
 #include "CorsFilter.h"
+#include "AuthenticationFilter.h"
 
 namespace restdbxx {
 
@@ -16,6 +17,6 @@ void FiltersFactory::onServerStop()noexcept {
 }
 proxygen::RequestHandler *FiltersFactory::onRequest(proxygen::RequestHandler *handler,
                                                     proxygen::HTTPMessage *message)noexcept {
-  return new LoggingFilter(new CorsFilter(handler));
+  return new LoggingFilter(new CorsFilter(new AuthenticationFilter(handler)));
 }
 }

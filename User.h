@@ -6,6 +6,7 @@
 #define RESTDBXX_USER_H
 #include <string>
 #include <boost/date_time/local_time/local_date_time.hpp>
+#include <folly/dynamic.h>
 using std::string;
 using namespace boost::date_time;
 
@@ -23,6 +24,12 @@ class User {
   void setPassword(const string &password);
   bool isIs_active() const;
   void setIs_active(bool is_active);
+
+  folly::dynamic toDynamic() {
+    return folly::dynamic::object("username", username)
+        ("password", password)
+        ("is_active", is_active);
+  }
 };
 
 

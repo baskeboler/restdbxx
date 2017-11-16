@@ -20,9 +20,8 @@ void LoggingFilter::onRequest(std::unique_ptr<proxygen::HTTPMessage> headers) no
   //proxygen::
   VLOG(google::GLOG_INFO) << "Handling request for " << headers->getMethodString()
             << " " << headers->getPath();
-  headers->getHeaders().forEach([](auto &k, auto &v) {
-    VLOG(google::GLOG_INFO) << k << ": " << v;
-  });
+  //headers->dumpMessageToSink(VLOG(google::GLOG_INFO));
+  headers->atomicDumpMessage(google::GLOG_INFO);
   upstream_->onRequest(std::move(headers));
 }
 void LoggingFilter::onBody(std::unique_ptr<folly::IOBuf> body) noexcept {

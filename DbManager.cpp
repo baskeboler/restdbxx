@@ -30,6 +30,10 @@ static const std::string &TEST_ENDPOINT_KEY() {
   static const std::string value = "/test_endpoint";
   return value;
 }
+static const std::string &TOKENS_KEY() {
+  static const std::string value = "/__tokens";
+  return value;
+}
 }
 
 std::shared_ptr<DbManager> DbManager::get_instance() {
@@ -88,6 +92,7 @@ DbManager::DbManager() {
     VLOG(GLOG_INFO) << "Test endpoint inexistent, creating.";
     add_endpoint(TEST_ENDPOINT_KEY());
     add_endpoint(USERS_KEY());
+    add_endpoint(TOKENS_KEY());
   }
 
 }
@@ -215,7 +220,8 @@ DbManager::~DbManager() {
     auto s = _db->DestroyColumnFamilyHandle(h);
     if (!s.ok()) LOG(ERROR) << s.ToString();
   }
-  _db.reset();
+  _db->Flush(rocksdb::FlushOptions());
+  //_db->reset();
 }
 void DbManager::add_endpoint(const std::string & path) {
   using rocksdb::DB;
@@ -371,7 +377,8 @@ void DbManager::perform_database_init_tasks() {
       rocksdb::ColumnFamilyDescriptor(ENDPOINTS_KEY(), cfOpts),
       rocksdb::ColumnFamilyDescriptor(ENDPOINTS_COUNT_KEY(), cfOpts),
       rocksdb::ColumnFamilyDescriptor(USERS_KEY(), cfOpts),
-      rocksdb::ColumnFamilyDescriptor(TEST_ENDPOINT_KEY(), cfOpts)
+      rocksdb::ColumnFamilyDescriptor(TEST_ENDPOINT_KEY(), cfOpts),
+      rocksdb::ColumnFamilyDescriptor(TOKENS_KEY(), cfOpts),
   };
   auto txnOpts = rocksdb::TransactionDBOptions();
   auto status = rocksdb::TransactionDB::Open(opts,
@@ -419,6 +426,9 @@ bool DbManager::is_initialized() {
     return false;
   }
   if (std::find(cfNames.begin(), cfNames.end(), TEST_ENDPOINT_KEY()) == cfNames.end()) {
+    return false;
+  }
+  if (std::find(cfNames.begin(), cfNames.end(), TOKENS_KEY()) == cfNames.end()) {
     return false;
   }
   return true;

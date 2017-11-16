@@ -95,18 +95,15 @@ void RestDbRequestHandler::onEOM() noexcept {
 
     //folly::StringPiece s(_body->buffer(), _body->length());
 
-    std::string str;
     //auto copy = _body->cloneCoalescedAsValue();
-    auto obj = folly::parseJson(_body->moveToFbString().toStdString());
+    auto obj = parseBody();
     auto db = DbManager::get_instance();
     db->post(_path, obj);
     sendJsonResponse(obj, 201, "Created");
     return;
   } else if (_method == HTTPMethod::PUT) {
 
-    std::string str;
-    auto copy = _body->cloneCoalescedAsValue();
-    auto obj = folly::parseJson(copy.moveToFbString().toStdString());
+    auto obj = parseBody();
     auto db = DbManager::get_instance();
     db->put(_path, obj);
     sendJsonResponse(obj);

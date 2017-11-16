@@ -9,6 +9,8 @@
 #include "includes.h"
 #include "EndpointControllerFactory.h"
 #include "FiltersFactory.h"
+#include "UserManager.h"
+#include "AuthenticationRequestHandler.h"
 
 using proxygen::HTTPServer;
 
@@ -32,6 +34,7 @@ DEFINE_string(db_path, "/tmp/restdb", "Path to the database");
 
 using google::GLOG_INFO;
 void initConfiguration();
+void init_services();
 int main(int argc, char **argv) {
   using namespace proxygen;
 
@@ -60,7 +63,8 @@ int main(int argc, char **argv) {
   options.shutdownOn = {SIGINT, SIGTERM};
   options.enableContentCompression = false;
   options.handlerFactories = RequestHandlerChain()
-      //.addThen<restdbxx::FiltersFactory>()
+      .addThen<restdbxx::FiltersFactory>()
+      .addThen<restdbxx::AuthenticationRequestHandlerFactory>()
       .addThen<restdbxx::EndpointControllerFactory>()
       .addThen<restdbxx::UserRequestHandlerFactory>()
       .addThen<restdbxx::RestDbRequestHandlerFactory>()
@@ -70,6 +74,7 @@ int main(int argc, char **argv) {
   proxygen::HTTPServer server(std::move(options));
   server.bind(IPs);
 
+  init_services();
 
   // Start HTTPServer mainloop in a separate thread
   std::thread t([&]() {
@@ -79,6 +84,24 @@ int main(int argc, char **argv) {
 
   t.join();
   return 0;
+}
+const string &DEFAULT_ADMIN_PASSWORD() {
+  static const std::string value = "admin";
+  return value;
+}
+void init_services() {
+  // force db init
+  auto db = restdbxx::DbManager::get_instance();
+
+  auto user_manager = restdbxx::UserManager::get_instance();
+
+  if (!user_manager->user_exists("admin")) {
+    VLOG(google::GLOG_INFO) << "admin user does not exist, creating";
+    user_manager->create_user("admin", DEFAULT_ADMIN_PASSWORD());
+    VLOG(google::GLOG_INFO) << "admin user created";
+  } else {
+    VLOG(google::GLOG_INFO) << "admin user exists";
+  }
 }
 
 void initConfiguration() {
