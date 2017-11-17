@@ -327,7 +327,7 @@ folly::Optional<folly::dynamic> DbManager::get_user(const std::string &username)
     auto obj = folly::parseJson(str.ToString());
     if (obj.at("username").asString() == username) {
       VLOG(google::GLOG_INFO) << "hay mas baratos! ";
-
+      delete s;
       return obj;
     }
     s->Next();

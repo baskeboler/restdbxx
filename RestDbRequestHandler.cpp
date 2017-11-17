@@ -22,7 +22,6 @@ static const char *INDEX_BODY = "<html>"
     "</html>";
 
 void RestDbRequestHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexcept {
-  auto db = DbManager::get_instance();
   //_headers = std::move(headers);
 
   if (headers->getMethod()) {
@@ -33,50 +32,6 @@ void RestDbRequestHandler::onRequest(std::unique_ptr<HTTPMessage> headers) noexc
   //auto p = headers->getPath();
   if (headers->getHeaders().exists("RESTDBXX_ADD_ENDPOINT"))
     is_endpoint_add = true;
-  folly::dynamic json;
-  switch (_method) {
-    case HTTPMethod::GET:
-      if (_path == "") {
-        sendStringResponse(INDEX_BODY);
-        return;
-      }
-      if (db->is_endpoint(_path)) {
-        getListingFuture().then([this](std::vector<folly::dynamic> &all) {
-          sendJsonResponse(folly::dynamic::array(all));
-        });
-        return;
-      }
-      json = db->get(_path).value();
-      sendJsonResponse(json);
-      return;
-    case HTTPMethod::POST:break;
-    case HTTPMethod::PUT:break;
-    case HTTPMethod::DELETE:
-      if (_path == "") {
-        sendStringResponse("dont delete root", 500, "not cool, bro");
-        return;
-      }
-
-      db->remove(_path);
-
-      sendEmptyContentResponse(200, "OK");
-      return;
-      break;
-    case HTTPMethod::OPTIONS:
-    case HTTPMethod::HEAD:
-    case HTTPMethod::CONNECT:
-    case HTTPMethod::TRACE:
-    case HTTPMethod::PATCH:
-      //default:
-      sendEmptyContentResponse(500, "Unhandled request");
-      return;
-      break;
-  }
-
-  if (not_found()) {
-    sendEmptyContentResponse(404, "Not Found");
-
-  }
 
 }
 folly::Future<std::vector<folly::dynamic>> RestDbRequestHandler::getListingFuture() const {
@@ -99,30 +54,83 @@ void RestDbRequestHandler::onBody(std::unique_ptr<folly::IOBuf> body) noexcept {
 }
 
 void RestDbRequestHandler::onEOM() noexcept {
+  auto db = DbManager::get_instance();
 
-  if (_method == HTTPMethod::POST) {
-    if (!_body) {
-      sendStringResponse("Cannot post empty body", 500, "Error");
+  switch (_method) {
+    case HTTPMethod::GET: {
+      folly::dynamic json;
+      if (_path == "") {
+        sendStringResponse(INDEX_BODY);
+        return;
+      }
+      if (db->is_endpoint(_path)) {
+        getListingFuture().then([this](std::vector<folly::dynamic> &all) {
+          sendJsonResponse(folly::dynamic::array(all));
+        });
+        return;
+      }
+      json = db->get(_path).value();
+      sendJsonResponse(json);
       return;
     }
+    case HTTPMethod::POST: {
+      if (!_body) {
+        sendStringResponse("Cannot post empty body", 500, "Error");
+        return;
+      }
 
-    //folly::StringPiece s(_body->buffer(), _body->length());
+      folly::Promise<folly::dynamic> promise;
+      auto f = promise.getFuture();
+      folly::EventBaseManager::get()->getEventBase()->runInLoop([p = std::move(promise), this]() mutable {
+        auto obj = parseBody();
+        auto db = DbManager::get_instance();
+        db->post(_path, obj);
+        p.setValue(obj);
+      });
+      f.then([this](folly::dynamic &obj) {
 
-    //auto copy = _body->cloneCoalescedAsValue();
-    auto obj = parseBody();
-    auto db = DbManager::get_instance();
-    db->post(_path, obj);
-    sendJsonResponse(obj, 201, "Created");
-    return;
-  } else if (_method == HTTPMethod::PUT) {
+        sendJsonResponse(obj, 201, "Created");
+      });
+      return;
+    }
+    case HTTPMethod::PUT: {
+      folly::Promise<folly::dynamic> promise;
+      auto f = promise.getFuture();
+      folly::EventBaseManager::get()->getEventBase()->runInLoop([p = std::move(promise), this]() mutable {
 
-    auto obj = parseBody();
-    auto db = DbManager::get_instance();
-    db->put(_path, obj);
-    sendJsonResponse(obj);
-    return;
-  } else {
-    // nothing
+        auto obj = parseBody();
+        auto db = DbManager::get_instance();
+        db->put(_path, obj);
+        p.setValue(obj);
+      });
+
+      f.then([this](folly::dynamic &obj) {
+
+        sendJsonResponse(obj);
+      });
+      return;
+      break;
+    }
+    case HTTPMethod::DELETE:
+      if (_path == "") {
+        sendStringResponse("dont delete root", 500, "not cool, bro");
+        return;
+      }
+
+      db->remove(_path);
+
+      sendEmptyContentResponse(200, "OK");
+      return;
+      break;
+    case HTTPMethod::OPTIONS:
+    case HTTPMethod::HEAD:
+    case HTTPMethod::CONNECT:
+    case HTTPMethod::TRACE:
+    case HTTPMethod::PATCH:
+      //default:
+      sendEmptyContentResponse(500, "Unhandled request");
+      return;
+      break;
   }
 
 }

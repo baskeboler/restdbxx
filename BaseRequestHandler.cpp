@@ -37,4 +37,9 @@ void BaseRequestHandler::sendStringResponse(const std::string &body, int status,
 BaseRequestHandler::BaseRequestHandler(): RequestHandler(){
 
 }
+folly::dynamic BaseRequestHandler::parseBody() const {
+  if (_body)
+    return folly::parseJson(_body->moveToFbString().toStdString());
+  return nullptr;
+}
 }
