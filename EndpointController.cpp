@@ -67,8 +67,9 @@ const std::string &EndpointController::ENDPOINTS_PATH() {
   return ENDPOINTS_PATH;
 }
 void EndpointController::processPost() {
-  folly::dynamic json = parseBody();
-  if (json.isObject() && json.at("url").isString()) {
+  folly::dynamic json = folly::dynamic::object();
+  json = parseBody();
+  if (json.isObject() && !json.empty() && json.at("url").isString()) {
     std::string url = json["url"].asString();
     auto db = DbManager::get_instance();
     db->add_endpoint(url);

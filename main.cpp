@@ -23,14 +23,16 @@ using folly::SocketAddress;
 
 using Protocol = HTTPServer::Protocol;
 
-
 DEFINE_int32(http_port, 11000, "Port to listen on with HTTP protocol");
+DEFINE_int32(https_port, 11043, "Port to listen on with HTTPS protocol");
 DEFINE_int32(spdy_port, 11001, "Port to listen on with SPDY protocol");
 DEFINE_int32(h2_port, 11002, "Port to listen on with HTTP/2 protocol");
 DEFINE_string(ip, "localhost", "IP/Hostname to bind to");
 DEFINE_int32(threads, 16, "Number of threads to listen on. Numbers <= 0 "
     "will use the number of cores on this machine.");
 DEFINE_string(db_path, "/tmp/restdb", "Path to the database");
+DEFINE_string(ssl_cert, "cert.pem", "SSL certificate file");
+DEFINE_string(ssl_key, "key.pem", "SSL key file");
 
 using google::GLOG_INFO;
 void initConfiguration();
@@ -42,12 +44,21 @@ int main(int argc, char **argv) {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   google::InstallFailureSignalHandler();
 
-  std::vector<HTTPServer::IPConfig> IPs = {{SocketAddress(FLAGS_ip, FLAGS_http_port, true), Protocol::HTTP},
+  std::vector<HTTPServer::IPConfig> IPs = {{SocketAddress(FLAGS_ip, FLAGS_https_port, true), Protocol::HTTP},
+                                           {SocketAddress(FLAGS_ip, FLAGS_http_port, true), Protocol::HTTP},
                                            {SocketAddress(FLAGS_ip, FLAGS_spdy_port, true), Protocol::SPDY},
                                            {SocketAddress(FLAGS_ip, FLAGS_h2_port, true), Protocol::HTTP2},
   };
+  wangle::SSLContextConfig sslConfig;
+  sslConfig.certificates = {
+      wangle::SSLContextConfig::CertificateInfo(FLAGS_ssl_cert, FLAGS_ssl_key, "")
+  };
+  sslConfig.isDefault = true;
+  IPs.front().sslConfigs = {std::move(sslConfig)};
+  sslConfig.isLocalPrivateKey = true;
   VLOG(GLOG_INFO) << "Starting restdbxx";
   VLOG(GLOG_INFO) << "HTTP PORT: " << FLAGS_http_port;
+  VLOG(GLOG_INFO) << "HTTPS PORT: " << FLAGS_https_port;
   VLOG(GLOG_INFO) << "SPDY PORT: " << FLAGS_spdy_port;
   VLOG(GLOG_INFO) << "H2 PORT: " << FLAGS_h2_port;
 

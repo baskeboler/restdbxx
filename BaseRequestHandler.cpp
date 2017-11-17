@@ -2,6 +2,7 @@
 // Created by victor on 11/7/17.
 //
 
+#include <folly/Try.h>
 #include "BaseRequestHandler.h"
 
 namespace restdbxx {
@@ -37,9 +38,15 @@ void BaseRequestHandler::sendStringResponse(const std::string &body, int status,
 BaseRequestHandler::BaseRequestHandler(): RequestHandler(){
 
 }
-folly::dynamic BaseRequestHandler::parseBody() const {
-  if (_body)
-    return folly::parseJson(_body->moveToFbString().toStdString());
+folly::dynamic BaseRequestHandler::parseBody() const throw() {
+  if (_body) {
+    std::string body_str = _body->moveToFbString().toStdString();
+    auto func = [body_str]() {
+      return folly::parseJson(body_str);
+    };
+    auto tryObj = folly::makeTryWith(func);
+    return tryObj.hasValue() ? tryObj.value() : folly::dynamic::object();
+  }
   return nullptr;
 }
 }

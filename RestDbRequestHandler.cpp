@@ -82,7 +82,9 @@ void RestDbRequestHandler::onEOM() noexcept {
       folly::Promise<folly::dynamic> promise;
       auto f = promise.getFuture();
       folly::EventBaseManager::get()->getEventBase()->runInLoop([p = std::move(promise), this]() mutable {
-        auto obj = parseBody();
+        folly::dynamic obj = folly::dynamic::object();
+        obj = parseBody();
+
         auto db = DbManager::get_instance();
         db->post(_path, obj);
         p.setValue(obj);
@@ -98,7 +100,8 @@ void RestDbRequestHandler::onEOM() noexcept {
       auto f = promise.getFuture();
       folly::EventBaseManager::get()->getEventBase()->runInLoop([p = std::move(promise), this]() mutable {
 
-        auto obj = parseBody();
+        folly::dynamic obj = folly::dynamic::object();
+        obj = parseBody();
         auto db = DbManager::get_instance();
         db->put(_path, obj);
         p.setValue(obj);
@@ -111,7 +114,7 @@ void RestDbRequestHandler::onEOM() noexcept {
       return;
       break;
     }
-    case HTTPMethod::DELETE:
+    case HTTPMethod::DELETE: {
       if (_path == "") {
         sendStringResponse("dont delete root", 500, "not cool, bro");
         return;
@@ -121,16 +124,15 @@ void RestDbRequestHandler::onEOM() noexcept {
 
       sendEmptyContentResponse(200, "OK");
       return;
-      break;
+    }
     case HTTPMethod::OPTIONS:
     case HTTPMethod::HEAD:
     case HTTPMethod::CONNECT:
     case HTTPMethod::TRACE:
-    case HTTPMethod::PATCH:
-      //default:
+    case HTTPMethod::PATCH: {   //default:
       sendEmptyContentResponse(500, "Unhandled request");
       return;
-      break;
+    }
   }
 
 }

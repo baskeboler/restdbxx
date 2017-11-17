@@ -34,8 +34,9 @@ void AuthenticationRequestHandler::onUpgrade(proxygen::UpgradeProtocol prot) noe
 void AuthenticationRequestHandler::onEOM() noexcept {
 
   if (_body && !_body->empty()) {
-    auto obj = parseBody();
-    if (!obj.isObject()
+    folly::dynamic obj = folly::dynamic::object();
+    obj = parseBody();
+    if (!obj.isObject() || obj.empty()
         || !obj.at("username").isString()
         || !obj.at("password").isString()) {
       sendStringResponse("Bad request object", 401, "Unauthorized");

@@ -65,7 +65,8 @@ void UserRequestHandler::onEOM() noexcept {
   } else if (_method == proxygen::HTTPMethod::POST && _path == USERS_PATH) {
     folly::Promise<folly::Optional<folly::dynamic>> promise;
     auto f = promise.getFuture();
-    auto obj = parseBody();
+    folly::dynamic obj = folly::dynamic::object();
+    obj = parseBody();
     folly::EventBaseManager::get()->getEventBase()->runInLoop([p = std::move(promise), this, obj]() mutable {
       auto db = DbManager::get_instance();
       bool valid = validateUser(obj);

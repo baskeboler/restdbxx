@@ -31,9 +31,10 @@ void AuthenticationFilter::onRequest(std::unique_ptr<proxygen::HTTPMessage> head
           .body("invalid token")
           .sendWithEOM();
       return;
-    } else {
-      VLOG(google::GLOG_INFO) << "token is valid, proceed";
     }
+
+    VLOG(google::GLOG_INFO) << "token is valid, proceed";
+
   }
   if (upstream_)
     upstream_->onRequest(std::move(headers));
