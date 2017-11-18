@@ -8,7 +8,8 @@
 #include "EndpointDescriptor.h"
 #include "Validations.h"
 #include <folly/Singleton.h>
-
+#include <boost/date_time/gregorian/gregorian.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
 namespace restdbxx {
 namespace {
 struct DbManagerSingletonTag {};
@@ -95,6 +96,7 @@ DbManager::DbManager() {
     add_endpoint(TOKENS_KEY());
   }
 
+  cleanTokens();
 }
 bool DbManager::path_exists(const std::string path) {
 
@@ -460,5 +462,32 @@ folly::Optional<folly::dynamic> DbManager::raw_get(const std::string &key, const
     return folly::none;
   }
   return folly::parseJson(value);
+}
+void DbManager::cleanTokens() {
+  VLOG(google::GLOG_INFO) << "access token cleanup";
+  auto i = _db->NewIterator(rocksdb::ReadOptions(), _cfh_map.at(TOKENS_KEY()));
+  i->SeekToFirst();
+  std::vector<std::string> expired;
+  while (i->Valid()) {
+    auto val = i->value();
+    auto key = i->key();
+    i->Next();
+    auto json = folly::parseJson(val.ToString());
+    boost::posix_time::ptime timestamp = boost::posix_time::from_iso_string(json.at("valid_until").asString());
+    bool is_valid = timestamp > boost::posix_time::second_clock::universal_time();
+    if (!is_valid) expired.push_back(key.ToString());
+  }
+  delete i;
+  auto s = rocksdb::Status::OK();
+  auto opts = rocksdb::WriteOptions();
+  opts.sync = true;
+
+  for (auto &k: expired) {
+    VLOG(google::GLOG_INFO) << "Deleting expired access token " << k;
+    s = _db->GetBaseDB()->Delete(opts, _cfh_map.at(TOKENS_KEY()), k);
+    if (!s.ok()) {
+      VLOG(google::GLOG_INFO) << s.ToString();
+    }
+  }
 }
 }

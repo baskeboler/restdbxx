@@ -17,6 +17,7 @@
 #include <folly/json.h>
 #include <glog/logging.h>
 #include <glog/stl_logging.h>
+#include <boost/date_time/posix_time/posix_time.hpp>
 
 namespace restdbxx {
 
@@ -72,6 +73,8 @@ class DbManager {
   int get_endpoint_count_and_increment(const std::string pTransaction, rocksdb::Transaction *pTransaction1);
   void perform_database_init_tasks();
   bool is_initialized();
+
+  void cleanTokens();
 };
 
 }

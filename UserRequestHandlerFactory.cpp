@@ -14,11 +14,9 @@ namespace restdbxx {
 
 const std::string USERS_PATH = "/__users";
 void UserRequestHandlerFactory::onServerStart(folly::EventBase *evb) noexcept {
-  VLOG(google::GLOG_INFO) << "starting server ";
 }
 void UserRequestHandlerFactory::onServerStop() noexcept {
 
-  VLOG(google::GLOG_INFO) << "stopping server ";
 }
 proxygen::RequestHandler *UserRequestHandlerFactory::onRequest(proxygen::RequestHandler *handler,
                                                                proxygen::HTTPMessage *message) noexcept {

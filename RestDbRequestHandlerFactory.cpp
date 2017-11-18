@@ -14,12 +14,9 @@
 namespace restdbxx {
 void RestDbRequestHandlerFactory::onServerStart(folly::EventBase *evb)noexcept {
 
-  VLOG(google::GLOG_INFO) << "starting server ";
-
 }
 void RestDbRequestHandlerFactory::onServerStop() noexcept {
 
-  VLOG(google::GLOG_INFO) << "stopping server ";
 }
 proxygen::RequestHandler *RestDbRequestHandlerFactory::onRequest(proxygen::RequestHandler *handler,
                                                                  proxygen::HTTPMessage *message) noexcept {

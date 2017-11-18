@@ -11,7 +11,7 @@
 #include "FiltersFactory.h"
 #include "UserManager.h"
 #include "AuthenticationRequestHandler.h"
-
+#include "FileServerRequestHandler.h"
 using proxygen::HTTPServer;
 
 
@@ -77,6 +77,7 @@ int main(int argc, char **argv) {
       .addThen<restdbxx::FiltersFactory>()
       .addThen<restdbxx::AuthenticationRequestHandlerFactory>()
       .addThen<restdbxx::EndpointControllerFactory>()
+      .addThen<restdbxx::FileServerRequestHandlerFactory>("/files", "/home/victor/tmp")
       .addThen<restdbxx::UserRequestHandlerFactory>()
       .addThen<restdbxx::RestDbRequestHandlerFactory>()
       .build();
@@ -124,3 +125,4 @@ void initConfiguration() {
   config->setIp(FLAGS_ip);
   config->setThreads(FLAGS_threads);
 }
+
