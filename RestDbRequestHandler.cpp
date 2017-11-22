@@ -10,6 +10,8 @@
 #include <proxygen/httpserver/ResponseBuilder.h>
 #include <folly/io/async/EventBaseManager.h>
 #include <folly/futures/Promise.h>
+#include <folly/executors/CPUThreadPoolExecutor.h>
+#include <folly/executors/GlobalExecutor.h>
 namespace restdbxx {
 using namespace proxygen;
 
@@ -69,35 +71,31 @@ void RestDbRequestHandler::onEOM() noexcept {
         });
         return;
       }
-      json = db->get(_path).value();
-      sendJsonResponse(json);
+      auto maybeJson = db->get(_path);
+      if (maybeJson) {
+        json = maybeJson.value();
+        sendJsonResponse(json);
+        return;
+      }
+      sendEmptyContentResponse(404, "Not Found");
       return;
     }
     case HTTPMethod::POST: {
-      if (!_body) {
-        sendStringResponse("Cannot post empty body", 500, "Error");
-        return;
-      }
-
       folly::Promise<folly::dynamic> promise;
       auto f = promise.getFuture();
       folly::EventBaseManager::get()->getEventBase()->runInLoop([p = std::move(promise), this]() mutable {
+        p.setTry(parseBody());
+      });
+      f.via(folly::getCPUExecutor().get()).then([this](folly::dynamic &json) {
         try {
-          auto obj = parseBody();
-          //if (obj.hasValue())
-          auto &json = obj.value();
-          //auto json = obj.value();
           auto db = DbManager::get_instance();
           db->post(_path, json);
-          p.setValue(json);
+          return folly::makeFuture(json);
         } catch (const std::exception &e) {
-
           VLOG(google::GLOG_INFO) << "Caught exception: " << e.what();
-          p.setException(e);
+          return folly::makeFuture<folly::dynamic>(e);
         }
-      });
-      f.then([this](folly::dynamic &obj) {
-
+      }).via(folly::EventBaseManager::get()->getEventBase()).then([this](folly::dynamic &obj) {
         sendJsonResponse(obj, 201, "Created");
       }).onError([this](const std::logic_error &e) {
         VLOG(google::GLOG_INFO) << "Error parsing json body: " << e.what();

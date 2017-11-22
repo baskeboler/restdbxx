@@ -37,8 +37,10 @@ class DbManager {
                 const std::string &cf_name = rocksdb::kDefaultColumnFamilyName);
 
   folly::Optional<folly::dynamic> raw_get(const std::string &key,
-                                          const std::string &cf_name = rocksdb::kDefaultColumnFamilyName);
-  /**
+                                          const std::string &cf_name);
+
+  folly::Optional<folly::dynamic> raw_get(const std::string &key);
+/**
    * @brief will add ID property to data
    * @param path path to post to
    * @param data json object

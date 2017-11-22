@@ -7,10 +7,12 @@
 #include <folly/FileUtil.h>
 #include <folly/executors/GlobalExecutor.h>
 #include <folly/io/async/EventBaseManager.h>
+#include <folly/String.h>
 #include <proxygen/httpserver/ResponseBuilder.h>
 #include <proxygen/httpserver/RequestHandler.h>
 #include <boost/algorithm/string.hpp>
 #include "FileServerRequestHandler.h"
+#include "RestDbConfiguration.h"
 #include <boost/filesystem.hpp>
 
 using proxygen::ResponseBuilder;
@@ -29,7 +31,7 @@ void FileServerRequestHandler::onRequest(std::unique_ptr<proxygen::HTTPMessage> 
   // characters like '//' or '..'
   try {
     // + 1 to kill leading /
-    std::string path = headers->getPath();
+    std::string path = folly::uriUnescape<std::string>(headers->getPath());
     boost::algorithm::erase_first(path, path_prefix);
     real_path = root + path;
     file_ = std::make_unique<folly::File>(real_path.c_str());
@@ -165,8 +167,14 @@ void FileServerRequestHandler::listFiles(folly::EventBase *evb) {
       "<body>"
       "<h1>Listing for " << real_path << "</h1>"
          "<ul>";
+//  std::stringstream ss;
+//  ss << "//" << path_prefix
   for (fs::directory_entry &entry: fs::directory_iterator(p)) {
-    ss << "<li>" << entry.path() << "</li>";
+    std::string url = entry.path().string();
+    boost::erase_first(url, root);
+    url = path_prefix + url;
+    ss << "<li><a href='" << url << "'>" << entry.path().filename().string()
+       << (boost::filesystem::is_directory(entry.path()) ? "/" : "") << "</a></li>";
   }
   ss << "</ul>"
       "</body>"

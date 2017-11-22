@@ -35,6 +35,11 @@ static const std::string &TOKENS_KEY() {
   static const std::string value = "/__tokens";
   return value;
 }
+
+static const std::string &ALL_OBJECTS_KEY() {
+  static const std::string value = "/___all_objects___";
+  return value;
+}
 }
 
 std::shared_ptr<DbManager> DbManager::get_instance() {
@@ -140,6 +145,8 @@ void DbManager::post(const std::string path, folly::dynamic &data) {
 
     rocksdb::WriteBatch batch;
     batch.Put(_cfh_map.at(path), new_path, new_val);
+    batch.Put(_cfh_map.at(ALL_OBJECTS_KEY()), new_path, new_val);
+    //batch.Put(new_path, new_val);
     int id = std::stoi(next_id);
     id++;
     batch.Put(path, std::to_string(id));
@@ -171,14 +178,19 @@ void DbManager::put(const std::string path, const folly::dynamic &data) {
 
       auto new_id = get_endpoint_count_and_increment(path, trx);
       auto new_key = path + "/" + std::to_string(new_id);
-      auto status = trx->Put(_cfh_map[path], new_key, folly::toPrettyJson(data));
+      std::string val = folly::toPrettyJson(data);
+      auto status = trx->Put(_cfh_map[path], new_key, val);
+      if (status.ok())
+        status = trx->Put(_cfh_map.at(ALL_OBJECTS_KEY()), new_key, val);
+      if (status.ok())
+        status = trx->Commit();
       if (!status.ok()) {
         trx->Rollback();
         VLOG(google::GLOG_WARNING) << "no pude commitear la transaccion: " << status.ToString();
         return;
       }
     } else {
-      _db->Put(rocksdb::WriteOptions(), path, folly::toJson(data));
+      _db->Put(rocksdb::WriteOptions(), _cfh_map.at(ALL_OBJECTS_KEY()), path, folly::toJson(data));
     }
   }
 }
@@ -300,16 +312,9 @@ folly::Optional<folly::dynamic> DbManager::get(const std::string path) const {
   }
 
   std::string value;
-  bool found = false;
-  bool may_exist = _db->KeyMayExist(readOpts, path, &value, &found);
-  if (found) {
+  auto s = _db->Get(readOpts, _cfh_map.at(ALL_OBJECTS_KEY()), path, &value);
+  if (s.ok()) {
     return parseJson(value);
-  }
-  if (may_exist) {
-    auto s = _db->Get(readOpts, path, &value);
-    if (s.ok()) {
-      return parseJson(value);
-    }
   }
 
   return folly::none;
@@ -376,6 +381,7 @@ void DbManager::perform_database_init_tasks() {
 
   std::vector<rocksdb::ColumnFamilyDescriptor> cfDescr = {
       rocksdb::ColumnFamilyDescriptor(rocksdb::kDefaultColumnFamilyName, cfOpts),
+      rocksdb::ColumnFamilyDescriptor(ALL_OBJECTS_KEY(), cfOpts),
       rocksdb::ColumnFamilyDescriptor(ENDPOINTS_KEY(), cfOpts),
       rocksdb::ColumnFamilyDescriptor(ENDPOINTS_COUNT_KEY(), cfOpts),
       rocksdb::ColumnFamilyDescriptor(USERS_KEY(), cfOpts),
@@ -427,6 +433,9 @@ bool DbManager::is_initialized() {
   if (std::find(cfNames.begin(), cfNames.end(), USERS_KEY()) == cfNames.end()) {
     return false;
   }
+  if (std::find(cfNames.begin(), cfNames.end(), ALL_OBJECTS_KEY()) == cfNames.end()) {
+    return false;
+  }
   if (std::find(cfNames.begin(), cfNames.end(), TEST_ENDPOINT_KEY()) == cfNames.end()) {
     return false;
   }
@@ -449,9 +458,16 @@ folly::dynamic DbManager::get_endpoint(const std::string &path) const {
 }
 void DbManager::raw_save(const std::string &key, folly::dynamic &data, const std::string &cf_name) {
 
-  auto s = _db->Put(rocksdb::WriteOptions(), _cfh_map.at(cf_name), key, folly::toPrettyJson(data));
+  std::string val = folly::toPrettyJson(data);
+  auto txn = _db->BeginTransaction(rocksdb::WriteOptions());
+  auto s = txn->Put(_cfh_map.at(cf_name), key, val);
+  if (s.ok())
+    s = txn->Put(_cfh_map.at(ALL_OBJECTS_KEY()), key, val);
+  if (s.ok())
+    s = txn->Commit();
   if (!s.ok()) {
     VLOG(google::GLOG_INFO) << "error saving token: " << s.ToString();
+    txn->Rollback();
   }
 }
 folly::Optional<folly::dynamic> DbManager::raw_get(const std::string &key, const std::string &cf_name) {
@@ -489,5 +505,8 @@ void DbManager::cleanTokens() {
       VLOG(google::GLOG_INFO) << s.ToString();
     }
   }
+}
+folly::Optional<folly::dynamic> DbManager::raw_get(const std::string &key) {
+  return raw_get(key, ALL_OBJECTS_KEY());
 }
 }
