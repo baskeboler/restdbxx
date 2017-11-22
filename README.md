@@ -7,6 +7,7 @@ the following libs should be compiled in this order:
 
 +  gflags
 + glog
++ boost 
 + folly
 + rocksdb
 + wangle

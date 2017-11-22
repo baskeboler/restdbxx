@@ -12,7 +12,8 @@ class FiltersFactory: public proxygen::RequestHandlerFactory {
   void onServerStart(folly::EventBase *evb) noexcept override;
   void onServerStop() noexcept override;
   proxygen::RequestHandler *onRequest(proxygen::RequestHandler *handler, proxygen::HTTPMessage *message) noexcept override;
-
+ private:
+  static std::vector<std::string> _blacklist;
 };
 
 }

@@ -11,6 +11,8 @@
 #include <proxygen/httpserver/RequestHandler.h>
 #include <boost/algorithm/string.hpp>
 #include "FileServerRequestHandler.h"
+#include <boost/filesystem.hpp>
+
 using proxygen::ResponseBuilder;
 using proxygen::HTTPMethod;
 namespace restdbxx {
@@ -29,8 +31,8 @@ void FileServerRequestHandler::onRequest(std::unique_ptr<proxygen::HTTPMessage> 
     // + 1 to kill leading /
     std::string path = headers->getPath();
     boost::algorithm::erase_first(path, path_prefix);
-    path = root + path;
-    file_ = std::make_unique<folly::File>(path.c_str());
+    real_path = root + path;
+    file_ = std::make_unique<folly::File>(real_path.c_str());
   } catch (const std::system_error &ex) {
     ResponseBuilder(downstream_)
         .status(404, "Not Found")
@@ -42,6 +44,16 @@ void FileServerRequestHandler::onRequest(std::unique_ptr<proxygen::HTTPMessage> 
   ResponseBuilder(downstream_)
       .status(200, "Ok")
       .send();
+  bool is_dir = boost::filesystem::is_directory(real_path);
+  if (is_dir) {
+    readFileScheduled_ = true;
+    folly::getCPUExecutor()->add(
+        std::bind(&FileServerRequestHandler::listFiles, this,
+                  folly::EventBaseManager::get()->getEventBase())
+    );
+    return;
+  }
+  //if (file_)
   // use a CPU executor since read(2) of a file can block
   readFileScheduled_ = true;
   folly::getCPUExecutor()->add(
@@ -141,6 +153,36 @@ void FileServerRequestHandler::onEgressResumed() noexcept {
 }
 FileServerRequestHandler::FileServerRequestHandler(const std::string &path_prefix, const std::string &root)
     : path_prefix(path_prefix), root(root) {}
+
+void FileServerRequestHandler::listFiles(folly::EventBase *evb) {
+  namespace fs = boost::filesystem;
+  fs::path p(real_path);
+  std::stringstream ss;
+  ss << "<html>"
+      "<head>"
+      "<title>file list</title>"
+      "</head>"
+      "<body>"
+      "<h1>Listing for " << real_path << "</h1>"
+         "<ul>";
+  for (fs::directory_entry &entry: fs::directory_iterator(p)) {
+    ss << "<li>" << entry.path() << "</li>";
+  }
+  ss << "</ul>"
+      "</body>"
+      "</html>";
+
+  std::string html = ss.str();
+
+  evb->runInEventBaseThread([data = std::move(html), this]() mutable {
+    proxygen::ResponseBuilder(downstream_)
+        .body(std::move(data))
+        .sendWithEOM();
+    finished_ = true;
+  });
+
+}
+
 void FileServerRequestHandlerFactory::onServerStart(folly::EventBase *evb) noexcept {
 
 }

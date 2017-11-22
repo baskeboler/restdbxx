@@ -5,12 +5,13 @@
 #ifndef RESTDBXX_BASEREQUESTHANDLER_H
 #define RESTDBXX_BASEREQUESTHANDLER_H
 
-#include <proxygen/lib/http/HTTPMessage.h>
+//#include <proxygen/lib/http/HTTPMessage.h>
 #include <proxygen/lib/http/HTTPMethod.h>
 #include <folly/dynamic.h>
 #include <proxygen/httpserver/RequestHandler.h>
 #include <proxygen/httpserver/ResponseBuilder.h>
 #include "DbManager.h"
+#include <folly/Try.h>
 
 namespace restdbxx {
 const std::string HTTP_MESSAGE_OK = "OK";
@@ -35,7 +36,7 @@ class BaseRequestHandler: public proxygen::RequestHandler {
   proxygen::HTTPMethod _method;
   std::string _path;
   virtual bool not_found() const;
-  folly::dynamic parseBody() const throw();
+  folly::Try<folly::dynamic> parseBody();
    bool is_endpoint_add = false;
 
   virtual void sendEmptyContentResponse(int status, const std::string &message) const;

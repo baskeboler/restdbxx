@@ -28,6 +28,8 @@ class FileServerRequestHandler : public proxygen::RequestHandler {
   bool readFileScheduled_{false};
   std::atomic<bool> paused_{false};
   bool finished_{false};
+  std::string real_path;
+  void listFiles(folly::EventBase *evb);
 };
 
 class FileServerRequestHandlerFactory : public proxygen::RequestHandlerFactory {

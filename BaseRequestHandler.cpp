@@ -2,9 +2,11 @@
 // Created by victor on 11/7/17.
 //
 
-#include <folly/Try.h>
+#include <folly/FBString.h>
 #include "BaseRequestHandler.h"
-
+#include <folly/Try.h>
+#include <folly/Conv.h>
+#include <folly/Range.h>
 namespace restdbxx {
 
 bool BaseRequestHandler::not_found() const {
@@ -32,21 +34,25 @@ void BaseRequestHandler::sendJsonResponse(const folly::dynamic &json, int status
 void BaseRequestHandler::sendStringResponse(const std::string &body, int status, const std::string &message) const {
   proxygen::ResponseBuilder(downstream_)
       .status(status, message)
-      .body("dont delete root")
+      .body(body)
       .sendWithEOM();
 }
-BaseRequestHandler::BaseRequestHandler(): RequestHandler(){
+BaseRequestHandler::BaseRequestHandler() : RequestHandler(), _body(folly::IOBuf::create(1024)) {
 
 }
-folly::dynamic BaseRequestHandler::parseBody() const throw() {
-  if (_body) {
-    std::string body_str = _body->moveToFbString().toStdString();
-    auto func = [body_str]() {
-      return folly::parseJson(body_str);
-    };
-    auto tryObj = folly::makeTryWith(func);
-    return tryObj.hasValue() ? tryObj.value() : folly::dynamic::object();
-  }
-  return nullptr;
+folly::Try<folly::dynamic> BaseRequestHandler::parseBody() {
+//  if (_body) {
+//  std::string body_str = val->moveToFbString().toStdString();//->cloneCoalescedAsValue().toStdString();
+  auto func = [b = _body->cloneCoalesced()]() {
+    if (!b) {
+      throw std::runtime_error("empty body");
+    }
+    std::string p(reinterpret_cast<const char *>(b->data()), b->length());
+    //auto clone = _body->clone();
+    return folly::parseJson(p);
+  };
+  return folly::makeTryWith(func);
+//  }
+//else return folly::Try::(std::runtime_error("empty body"));
 }
 }

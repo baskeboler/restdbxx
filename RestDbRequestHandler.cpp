@@ -82,16 +82,29 @@ void RestDbRequestHandler::onEOM() noexcept {
       folly::Promise<folly::dynamic> promise;
       auto f = promise.getFuture();
       folly::EventBaseManager::get()->getEventBase()->runInLoop([p = std::move(promise), this]() mutable {
-        folly::dynamic obj = folly::dynamic::object();
-        obj = parseBody();
+        try {
+          auto obj = parseBody();
+          //if (obj.hasValue())
+          auto &json = obj.value();
+          //auto json = obj.value();
+          auto db = DbManager::get_instance();
+          db->post(_path, json);
+          p.setValue(json);
+        } catch (const std::exception &e) {
 
-        auto db = DbManager::get_instance();
-        db->post(_path, obj);
-        p.setValue(obj);
+          VLOG(google::GLOG_INFO) << "Caught exception: " << e.what();
+          p.setException(e);
+        }
       });
       f.then([this](folly::dynamic &obj) {
 
         sendJsonResponse(obj, 201, "Created");
+      }).onError([this](const std::logic_error &e) {
+        VLOG(google::GLOG_INFO) << "Error parsing json body: " << e.what();
+        sendStringResponse("Parsing error", 400, "Bad Request");
+      }).onError([this](const std::exception &e) {
+        VLOG(google::GLOG_INFO) << "Error parsing json body: " << e.what();
+        sendStringResponse("Parsing error", 400, "Bad Request");
       });
       return;
     }
@@ -101,7 +114,7 @@ void RestDbRequestHandler::onEOM() noexcept {
       folly::EventBaseManager::get()->getEventBase()->runInLoop([p = std::move(promise), this]() mutable {
 
         folly::dynamic obj = folly::dynamic::object();
-        obj = parseBody();
+        obj = parseBody().value();
         auto db = DbManager::get_instance();
         db->put(_path, obj);
         p.setValue(obj);
