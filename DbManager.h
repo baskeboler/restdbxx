@@ -18,19 +18,32 @@
 #include <glog/logging.h>
 #include <glog/stl_logging.h>
 #include <boost/date_time/posix_time/posix_time.hpp>
+#include <stdexcept>
 
 namespace restdbxx {
 
+/**
+ *
+ */
+class DbManagerException : public std::runtime_error {
+ public:
+  DbManagerException(const std::string &__arg) : std::runtime_error(__arg) {
+
+  }
+
+  DbManagerException() : DbManagerException("DbManager Exception") {}
+  virtual ~DbManagerException() = default;
+};
+
+/**
+ *
+ */
 class DbManager {
  public:;
   DbManager();
 
   bool path_exists(std::string path);
   bool can_post(const std::string path);
-
-  //folly::dynamic to_deep_object(std::vector<std::string> &path, const folly::dynamic &unwrapped);
-
-  //void deep_merge(folly::dynamic &dest, folly::dynamic &merge_obj);
 
   void raw_save(const std::string &key,
                 folly::dynamic &data,
@@ -53,16 +66,13 @@ class DbManager {
 
   void add_endpoint(const std::string &path);
   folly::dynamic get_endpoint(const std::string &path) const;
-
+  void delete_endpoint(const std::string &path);
   std::vector<std::string> get_endpoints() const;
-  bool is_endpoint(const std::string& path) const;
+  bool is_endpoint(const std::string &path) const;
 
   static std::shared_ptr<DbManager> get_instance();
-  virtual ~DbManager();
 
-  /*void save_user(folly::dynamic &userJson) {
-    if (!get_user(userJson["password"].asString())) this->post(USERS_CF, userJson);
-  }*/
+  virtual ~DbManager();
 
   folly::Optional<folly::dynamic> get_user(const std::string &username);
 
@@ -70,9 +80,10 @@ class DbManager {
  private:
   std::unique_ptr<rocksdb::TransactionDB> _db;
   std::vector<std::string> get_path_parts(std::string path) const;
-  std::vector<rocksdb::ColumnFamilyHandle *> _handles;
   std::map<std::string, rocksdb::ColumnFamilyHandle *> _cfh_map;
-  int get_endpoint_count_and_increment(const std::string pTransaction, rocksdb::Transaction *pTransaction1);
+  int get_endpoint_count_and_increment(
+      const std::string pTransaction,
+      rocksdb::Transaction *pTransaction1);
   void perform_database_init_tasks();
   bool is_initialized();
 

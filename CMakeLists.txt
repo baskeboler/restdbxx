@@ -64,7 +64,7 @@ set(SOURCE_FILES
         UserRequestHandler.h UserRequestHandlerFactory.cpp
         UserRequestHandlerFactory.h Validations.cpp
 
-        RestDbConfiguration.cpp includes.h BaseRequestHandler.cpp BaseRequestHandler.h CorsFilter.cpp CorsFilter.h EndpointDescriptor.cpp EndpointDescriptor.h EndpointController.cpp EndpointController.h EndpointControllerFactory.cpp EndpointControllerFactory.h FiltersFactory.cpp FiltersFactory.h AuthenticationRequestHandler.cpp AuthenticationRequestHandler.h AuthenticationFilter.cpp AuthenticationFilter.h FileServerRequestHandler.cpp FileServerRequestHandler.h)
+        RestDbConfiguration.cpp includes.h BaseRequestHandler.cpp BaseRequestHandler.h CorsFilter.cpp CorsFilter.h EndpointDescriptor.cpp EndpointDescriptor.h EndpointController.cpp EndpointController.h EndpointControllerFactory.cpp EndpointControllerFactory.h FiltersFactory.cpp FiltersFactory.h AuthenticationRequestHandler.cpp AuthenticationRequestHandler.h AuthenticationFilter.cpp AuthenticationFilter.h FileServerRequestHandler.cpp FileServerRequestHandler.h GiphySearchRequestHandler.cpp GiphySearchRequestHandler.h JsonClient.cpp JsonClient.h XkcdRequestHandler.cpp XkcdRequestHandler.h SimpleRoutingRequestHandlerFactory.cpp SimpleRoutingRequestHandlerFactory.h)
 add_executable(restdbxx ${SOURCE_FILES})
 
 target_link_libraries(restdbxx ${LIBS})

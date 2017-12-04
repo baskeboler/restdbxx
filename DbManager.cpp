@@ -75,21 +75,23 @@ DbManager::DbManager() {
     descrs.emplace_back(n, cfOpts);
   }
   rocksdb::TransactionDB *db;
-  _handles.clear();
+  std::vector<rocksdb::ColumnFamilyHandle *> handles;
+  handles.clear();
   status = rocksdb::TransactionDB::Open(opts,
                                         rocksdb::TransactionDBOptions(),
                                         db_path,
                                         const_cast<const std::vector<rocksdb::ColumnFamilyDescriptor> &>(descrs),
-                                        &_handles,
+                                        &handles,
                                         &db);
   if (!status.ok()) {
     VLOG(google::GLOG_ERROR) << status.ToString();
   }
   _db.reset(db);
   VLOG(GLOG_INFO) << "Listing column families";
-  for (auto handle: _handles) {
+  for (auto handle: handles) {
     VLOG(GLOG_INFO) << handle->GetName();
-    _cfh_map.emplace(handle->GetName(), handle);
+    std::string hName(handle->GetName());
+    _cfh_map.insert(std::make_pair<std::string, rocksdb::ColumnFamilyHandle *>(move(hName), std::move(handle)));
   }
   VLOG(GLOG_INFO) << "End of column families";
 
@@ -199,7 +201,10 @@ void DbManager::remove(const std::string path) {
   if (path_exists(path)) {
     auto parts = get_path_parts(path);
     //  auto aux = &_root;
+    rocksdb::TransactionOptions txnOpts;
+    rocksdb::WriteOptions writeOpts;
 
+//    auto txn = _db->BeginTransaction(writeOpts, txnOpts);
     for (auto part = parts.begin(); part != parts.end(); ++part) {
       if (std::distance(part, parts.end()) == 1) {
         //last part
@@ -230,14 +235,14 @@ bool DbManager::can_post(const std::string path) {
   return is_endpoint(path);
 }
 DbManager::~DbManager() {
-  for (auto h: _handles) {
-    auto s = _db->DestroyColumnFamilyHandle(h);
+  for (auto h: _cfh_map) {
+    auto s = _db->DestroyColumnFamilyHandle(h.second);
     if (!s.ok()) LOG(ERROR) << s.ToString();
   }
   _db->Flush(rocksdb::FlushOptions());
   //_db->reset();
 }
-void DbManager::add_endpoint(const std::string & path) {
+void DbManager::add_endpoint(const std::string &path) {
   using rocksdb::DB;
   using google::WARNING;
   VLOG(google::GLOG_INFO) << "Creating endpoint " << path;
@@ -245,7 +250,8 @@ void DbManager::add_endpoint(const std::string & path) {
   rocksdb::ColumnFamilyHandle *handle;
 
   auto cfOpts = rocksdb::ColumnFamilyOptions();
-  auto status = _db->CreateColumnFamily(cfOpts, path, &handle);
+  cfOpts.OptimizeForSmallDb();
+  auto status = _db->GetBaseDB()->CreateColumnFamily(cfOpts, path, &handle);
   if (!status.ok()) {
     VLOG(google::GLOG_ERROR) << status.ToString();
   }
@@ -265,7 +271,7 @@ void DbManager::add_endpoint(const std::string & path) {
   if (!status.ok()) {
     VLOG(WARNING) << "Error creating column family: " << status.ToString();
   }
-  _cfh_map.emplace(path, handle);
+  _cfh_map[path] = handle;
 
   folly::dynamic val = folly::dynamic::array();
   status = txn->Put(_db->DefaultColumnFamily(), path, "0");
@@ -278,6 +284,7 @@ void DbManager::add_endpoint(const std::string & path) {
   }
   delete txn;
 }
+
 std::vector<std::string> DbManager::get_endpoints() const {
   auto opts = rocksdb::ReadOptions();
   auto iterator = _db->NewIterator(opts);
@@ -301,13 +308,13 @@ folly::Optional<folly::dynamic> DbManager::get(const std::string path) const {
     it->SeekToFirst();
 //    VLOG(GLOG_INFO) << "iterating cf";
     while (it->Valid()) {
-  //    VLOG(GLOG_INFO) << it->key().ToString() << ": " << it->value().ToString();
+      //    VLOG(GLOG_INFO) << it->key().ToString() << ": " << it->value().ToString();
       std::string value = it->value().ToString();
       folly::dynamic v = parseJson(value);
       ret.push_back(v);
       it->Next();
     }
-
+    delete it;
     return ret;
   }
 
@@ -326,23 +333,16 @@ bool DbManager::is_endpoint(const std::string &path) const {
 folly::Optional<folly::dynamic> DbManager::get_user(const std::string &username) {
 
   std::string value;
-  auto s = _db->NewIterator(rocksdb::ReadOptions(), _cfh_map[USERS_KEY()]);
-  s->SeekToFirst();
-  while (s->Valid()) {
-    VLOG(google::GLOG_INFO) << "Iterating over users " << s->key().ToString() << "  --  " << s->value().ToString();
-    auto str = s->value();
-    auto obj = folly::parseJson(str.ToString());
-    if (obj.at("username").asString() == username) {
-      VLOG(google::GLOG_INFO) << "hay mas baratos! ";
-      delete s;
-      return obj;
-    }
-    s->Next();
-  }
-  delete s;
+  std::string key = USERS_KEY() + "/" + username;
+  auto s = _db->Get(rocksdb::ReadOptions(), _cfh_map.at(USERS_KEY()), key, &value);
+  if (s.ok())
+    return folly::parseJson(value);
   return folly::none;
 }
 void DbManager::get_all(const std::string &path, std::vector<folly::dynamic> &result) {
+  if (_cfh_map.find(path) == _cfh_map.end() || _cfh_map[path] == nullptr) {
+    throw DbManagerException("column family handle unavailable");
+  }
   auto s = _db->NewIterator(rocksdb::ReadOptions(), _cfh_map[path]);
   s->SeekToFirst();
   while (s->Valid()) {
@@ -508,5 +508,65 @@ void DbManager::cleanTokens() {
 }
 folly::Optional<folly::dynamic> DbManager::raw_get(const std::string &key) {
   return raw_get(key, ALL_OBJECTS_KEY());
+}
+void DbManager::delete_endpoint(const std::string &path) {
+
+  if (!is_endpoint(path))
+    throw DbManagerException("path is not an endpoint");
+  rocksdb::TransactionOptions tOpts;
+  rocksdb::WriteOptions wOpts;
+  wOpts.sync = true;
+
+  rocksdb::ReadOptions rOpts;
+//  rOpts.managed
+  rocksdb::Status s;
+  auto txn = _db->BeginTransaction(wOpts, tOpts);
+
+  if (_cfh_map.find(path) != _cfh_map.end() && _cfh_map[path] != nullptr) {
+    auto i = _db->NewIterator(rOpts, _cfh_map[path]);
+
+    i->SeekToFirst();
+//  std::vector<std::string> paths;
+    while (i->Valid()) {
+      VLOG(google::GLOG_INFO) << "Deleting key " << i->key().ToString();
+      txn->Delete(i->key());
+      if (!s.ok()) {
+        throw DbManagerException(s.ToString());
+      }
+      i->Next();
+    }
+    delete i;
+  }
+
+  VLOG(google::GLOG_INFO) << "Deleting path " << path;
+  s = txn->Delete(path);
+  if (!s.ok()) {
+    throw DbManagerException(s.ToString());
+  }
+
+  VLOG(google::GLOG_INFO) << "Deleting endpoint descriptor ";
+  std::string descr_key = ENDPOINTS_KEY() + path;
+  s = txn->Delete(_cfh_map.at(ENDPOINTS_KEY()), descr_key);
+  if (!s.ok()) {
+    throw DbManagerException(s.ToString());
+  }
+
+  VLOG(google::GLOG_INFO) << "Commiting transaction";
+  txn->Commit();
+  delete txn;
+
+  VLOG(google::GLOG_INFO) << "Erasing column family from cf map";
+  auto i = _cfh_map.find(path);
+  rocksdb::ColumnFamilyHandle *h{nullptr};
+  if (i != _cfh_map.end()) {
+    h = i->second;
+    _cfh_map.erase(i);
+  }
+  VLOG(google::GLOG_INFO) << "Destroying column family for " << path;
+  s = _db->GetBaseDB()->DropColumnFamily(h);
+  if (!s.ok()) {
+    throw DbManagerException(s.ToString());
+  }
+
 }
 }

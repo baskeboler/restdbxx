@@ -14,6 +14,8 @@
 #include "UserManager.h"
 #include "AuthenticationRequestHandler.h"
 #include "FileServerRequestHandler.h"
+#include "GiphySearchRequestHandler.h"
+#include "XkcdRequestHandler.h"
 #include <memory>
 using proxygen::HTTPServer;
 
@@ -31,11 +33,12 @@ DEFINE_int32(https_port, 11043, "Port to listen on with HTTPS protocol");
 DEFINE_int32(spdy_port, 11001, "Port to listen on with SPDY protocol");
 DEFINE_int32(h2_port, 11002, "Port to listen on with HTTP/2 protocol");
 DEFINE_string(ip, "localhost", "IP/Hostname to bind to");
-DEFINE_int32(threads, 16, "Number of threads to listen on. Numbers <= 0 "
+DEFINE_int32(threads, 0, "Number of threads to listen on. Numbers <= 0 "
     "will use the number of cores on this machine.");
 DEFINE_string(db_path, "/tmp/restdb", "Path to the database");
 DEFINE_string(ssl_cert, "cert.pem", "SSL certificate file");
 DEFINE_string(ssl_key, "key.pem", "SSL key file");
+DEFINE_string(giphy_api_key, "GIPHY-API-KEY", "Giphy API key");
 
 using google::GLOG_INFO;
 void initConfiguration();
@@ -47,7 +50,6 @@ int main(int argc, char **argv) {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   google::InstallFailureSignalHandler();
   initConfiguration();
-
   auto conf = restdbxx::RestDbConfiguration::get_instance();
   std::vector<HTTPServer::IPConfig> IPs = {{SocketAddress(FLAGS_ip, conf->getHttps_port(), true), Protocol::HTTP},
                                            {SocketAddress(FLAGS_ip, conf->getHttp_port(), true), Protocol::HTTP},
@@ -84,6 +86,10 @@ int main(int argc, char **argv) {
   }
   handlerChain
       ->addThen<restdbxx::UserRequestHandlerFactory>()
+      .addThen<restdbxx::GiphySearchRequestHandlerFactory>(
+          conf->get_giphy_mount_path(),
+          conf->get_giphy_api_key())
+      .addThen<restdbxx::XkcdRequestHandlerFactory>("/xkcd")
       .addThen<restdbxx::RestDbRequestHandlerFactory>();
   proxygen::HTTPServerOptions options;
   options.threads = static_cast<size_t>(FLAGS_threads);
@@ -92,8 +98,7 @@ int main(int argc, char **argv) {
   options.enableContentCompression = false;
   options.handlerFactories = handlerChain->build();
   options.h2cEnabled = false;
-  //delete &handlerChain;
-//  auto shared = std::make_shared(std::move(handlerChain));
+
   auto diskIOThreadPool = std::make_shared<folly::CPUThreadPoolExecutor>(
       FLAGS_threads,
       std::make_shared<folly::NamedThreadFactory>("StaticDiskIOThread"));

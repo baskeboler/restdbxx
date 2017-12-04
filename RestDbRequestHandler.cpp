@@ -40,10 +40,14 @@ folly::Future<std::vector<folly::dynamic>> RestDbRequestHandler::getListingFutur
   folly::Promise<std::vector<folly::dynamic>> promise;
   auto future = promise.getFuture();
   folly::EventBaseManager::get()->getEventBase()->runInLoop([p = move(promise), this]() mutable {
-    auto db = DbManager::get_instance();
-    std::vector<folly::dynamic> all;
-    db->get_all(_path, all);
-    p.setValue(all);
+    try {
+      auto db = DbManager::get_instance();
+      std::vector<folly::dynamic> all;
+      db->get_all(_path, all);
+      p.setValue(all);
+    } catch (DbManagerException &e) {
+      p.setException(e);
+    }
   });
   return future;
 }
@@ -68,16 +72,28 @@ void RestDbRequestHandler::onEOM() noexcept {
       if (db->is_endpoint(_path)) {
         getListingFuture().then([this](std::vector<folly::dynamic> &all) {
           sendJsonResponse(folly::dynamic::array(all));
+        }).onError([this](DbManagerException &e) {
+          sendStringResponse(e.what(), 500, "internal error");
         });
         return;
       }
-      auto maybeJson = db->get(_path);
-      if (maybeJson) {
-        json = maybeJson.value();
+      folly::Promise<folly::dynamic> promise;
+      auto f = promise.getFuture();
+      folly::EventBaseManager::get()->getEventBase()->runInLoop([p = std::move(promise), this, db]() mutable {
+
+        auto maybeJson = db->get(_path);
+        if (maybeJson) {
+          p.setValue(maybeJson.value());
+        } else
+          p.setException(not_found_exception());
+      });
+      f.then([this](folly::dynamic &json) {
         sendJsonResponse(json);
-        return;
-      }
-      sendEmptyContentResponse(404, "Not Found");
+
+      }).onError([this](const not_found_exception &e) {
+        sendEmptyContentResponse(404, "Not Found");
+
+      });
       return;
     }
     case HTTPMethod::POST: {
@@ -86,7 +102,7 @@ void RestDbRequestHandler::onEOM() noexcept {
       folly::EventBaseManager::get()->getEventBase()->runInLoop([p = std::move(promise), this]() mutable {
         p.setTry(parseBody());
       });
-      f.via(folly::getCPUExecutor().get()).then([this](folly::dynamic &json) {
+      f.then([this](folly::dynamic &json) {
         try {
           auto db = DbManager::get_instance();
           db->post(_path, json);
@@ -95,7 +111,7 @@ void RestDbRequestHandler::onEOM() noexcept {
           VLOG(google::GLOG_INFO) << "Caught exception: " << e.what();
           return folly::makeFuture<folly::dynamic>(e);
         }
-      }).via(folly::EventBaseManager::get()->getEventBase()).then([this](folly::dynamic &obj) {
+      }).then([this](folly::dynamic &obj) {
         sendJsonResponse(obj, 201, "Created");
       }).onError([this](const std::logic_error &e) {
         VLOG(google::GLOG_INFO) << "Error parsing json body: " << e.what();
@@ -110,10 +126,10 @@ void RestDbRequestHandler::onEOM() noexcept {
       folly::Promise<folly::dynamic> promise;
       auto f = promise.getFuture();
       folly::EventBaseManager::get()->getEventBase()->runInLoop([p = std::move(promise), this]() mutable {
-
+        auto db = DbManager::get_instance();
         folly::dynamic obj = folly::dynamic::object();
         obj = parseBody().value();
-        auto db = DbManager::get_instance();
+        //db= DbManager::get_instance();
         db->put(_path, obj);
         p.setValue(obj);
       });
@@ -137,6 +153,12 @@ void RestDbRequestHandler::onEOM() noexcept {
       return;
     }
     case HTTPMethod::OPTIONS:
+      ResponseBuilder(downstream_)
+          .status(200, "OK")
+          .header(proxygen::HTTPHeaderCode::HTTP_HEADER_ACCESS_CONTROL_ALLOW_METHODS, "GET,POST,DELETE,PUT")
+          .header(proxygen::HTTPHeaderCode::HTTP_HEADER_ACCESS_CONTROL_ALLOW_HEADERS, "content-type")
+          .sendWithEOM();
+      return;
     case HTTPMethod::HEAD:
     case HTTPMethod::CONNECT:
     case HTTPMethod::TRACE:

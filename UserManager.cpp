@@ -95,7 +95,8 @@ std::unique_ptr<User> UserManager::create_user(const std::string &username, cons
 
   auto db = DbManager::get_instance();
   auto json = user->toDynamic();
-  db->post("/__users", json);
+  std::string key = "/__users/" + user->getUsername();
+  db->raw_save(key, json, "/__users");
   return user;
 }
 std::unique_ptr<AccessToken> AccessToken::fromDynamic(folly::dynamic &json) {

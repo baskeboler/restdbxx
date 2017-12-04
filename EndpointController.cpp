@@ -27,8 +27,48 @@ void EndpointController::onRequest(std::unique_ptr<proxygen::HTTPMessage> header
 
         });
         return;
+      } else {
+        auto db = DbManager::get_instance();
+        std::string pathTmp = _path;
+        boost::erase_first(pathTmp, ENDPOINTS_PATH());
+        if (db->is_endpoint(pathTmp)) {
+          auto e = db->get_endpoint(pathTmp);
+          sendJsonResponse(e);
+          return;
+        }
+        sendEmptyContentResponse(404, "not found");
+        return;
       }
       break;
+    case proxygen::HTTPMethod::OPTIONS:
+      proxygen::ResponseBuilder(downstream_)
+          .status(200, "OK")
+          .header(proxygen::HTTPHeaderCode::HTTP_HEADER_ACCESS_CONTROL_ALLOW_METHODS, "GET,POST,DELETE,PUT")
+          .header(proxygen::HTTPHeaderCode::HTTP_HEADER_ACCESS_CONTROL_ALLOW_HEADERS, "content-type")
+          .sendWithEOM();
+      return;
+    case proxygen::HTTPMethod::DELETE: {
+      folly::Promise<folly::Unit> p;
+      auto future = p.getFuture();
+      folly::EventBaseManager::get()->getEventBase()->runInLoop([p = std::move(p), this]() mutable {
+        auto db = DbManager::get_instance();
+        try {
+          std::string pathTmp(_path);
+          boost::erase_first(pathTmp, ENDPOINTS_PATH());
+
+          db->delete_endpoint(pathTmp);
+          p.setValue();
+        } catch (DbManagerException &e) {
+          p.setException(e);
+        }
+      });
+      future.then([this]() {
+        sendEmptyContentResponse(200, "OK");
+      }).onError([this](DbManagerException &e) {
+        sendStringResponse(e.what(), 500, "error");
+      });
+      break;
+    }
     default:break;
       //sendEmptyContentResponse(500, "internal error");
   }

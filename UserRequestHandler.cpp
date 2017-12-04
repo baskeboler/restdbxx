@@ -112,6 +112,12 @@ void UserRequestHandler::onEOM() noexcept {
         }).onError([this](const std::exception &e) {
           sendStringResponse(e.what(), 500, "Internal Error");
         });
+  } else if (_method == proxygen::HTTPMethod::OPTIONS && _path == USERS_PATH) {
+    ResponseBuilder(downstream_)
+        .status(200, "OK")
+        .header(proxygen::HTTPHeaderCode::HTTP_HEADER_ACCESS_CONTROL_ALLOW_METHODS, "GET,POST.DELETE,PUT")
+        .header(proxygen::HTTPHeaderCode::HTTP_HEADER_ACCESS_CONTROL_ALLOW_HEADERS, "content-type")
+        .sendWithEOM();
   }
 }
 

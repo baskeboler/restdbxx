@@ -11,26 +11,31 @@ namespace restdbxx {
 
 
 class RestDbConfiguration {
+ private:
   int http_port;
   int https_port;
- public:
-  int getHttps_port() const;
-  void setHttps_port(int https_port);
- private:
   int spdy_port;
   int h2_port;
   std::string ip;
   int threads;
   std::string db_path;
-
+  std::string giphy_api_key;
+  std::string giphy_mount_path;
+ public:
+  const std::string &get_giphy_mount_path() const;
+  void set_giphy_mount_path(const std::string &giphy_mount_path);
+ private:
   // file server endpoint;
   bool file_server_enabled = false;
   // endpoint path to access files
   std::string file_server_path = {};
   // filesystem directory served
   std::string file_server_root = {};
-
  public:
+  int getHttps_port() const;
+  void setHttps_port(int https_port);
+  const std::string &get_giphy_api_key() const;
+  void set_giphy_api_key(const std::string &giphy_api_key);
   bool is_file_server_enabled() const;
   void set_file_server_enabled(bool file_server_enabled);
   const std::string &getFile_server_path() const;

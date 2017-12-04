@@ -10,4 +10,8 @@
 #include "LoggingFilter.h"
 #include "RestDbRequestHandlerFactory.h"
 #include "UserRequestHandlerFactory.h"
+#include "User.h"
+#include "UserManager.h"
+#include "BaseRequestHandler.h"
+
 #endif //RESTDBXX_INCLUDES_H

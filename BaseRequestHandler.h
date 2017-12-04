@@ -17,6 +17,12 @@ namespace restdbxx {
 const std::string HTTP_MESSAGE_OK = "OK";
 
 using proxygen::RequestHandler;
+
+class not_found_exception : public std::runtime_error {
+ public:
+  not_found_exception() : std::runtime_error("not found") {}
+  virtual ~not_found_exception() = default;
+};
 class BaseRequestHandler: public proxygen::RequestHandler {
  public:
   BaseRequestHandler();
