@@ -71,3 +71,52 @@ f.then([this](SomeResult& res) {
 });
 
 ```
+
+## JsonClient
+
+Utility class created with the purpose of making GET requests to remote servers less painful.
+
+### usage
+
+You initialize the class with the requests details and then you invoke the following
+method:
+
+> `void JsonClient::fetch(proxygen::HTTPMessage *req, folly::Promise<folly::dynamic> &promise)`
+
+Pay attention to the promise that the function receives, you should get a future from that 
+promise before calling `fetch()`.
+
+Here is an example:
+
+```cpp
+folly::Promise<folly::dynamic> promise;
+  auto f = promise.getFuture();
+  folly::EventBaseManager::get()->getEventBase()
+      ->runInLoop([comic, p = std::move(promise), this]() mutable {
+        auto req = new HTTPMessage();
+        std::stringstream ss;
+        ss << "https://xkcd.com/";
+        if (comic) {
+          ss << comic.value() << "/";
+        }
+        ss << "info.0.json";
+        req->setURL(ss.str());
+        req->setMethod(HTTPMethod::GET);
+        client->fetch(req, p);
+      });
+  f.then([this](folly::dynamic &comic) mutable {
+    ResponseBuilder(downstream_)
+        .status(200, "OK")
+        .header("RESTDBXX_QUERY_TIME", std::to_string(client->get_elapsed()))
+        .header(proxygen::HTTPHeaderCode::HTTP_HEADER_CONTENT_TYPE, "application/json")
+        .body(folly::toPrettyJson(comic))
+        .sendWithEOM();
+    return;
+  }).onError([this](const std::runtime_error &e) {
+    ResponseBuilder(downstream_)
+        .status(500, "unexpected error")
+        .body(e.what())
+        .sendWithEOM();
+
+  });
+```
