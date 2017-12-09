@@ -4,9 +4,6 @@
 
 #include <folly/FBString.h>
 #include "BaseRequestHandler.h"
-#include <folly/Try.h>
-#include <folly/Conv.h>
-#include <folly/Range.h>
 namespace restdbxx {
 
 bool BaseRequestHandler::not_found() const {
@@ -55,4 +52,12 @@ folly::Try<folly::dynamic> BaseRequestHandler::parseBody() {
 //  }
 //else return folly::Try::(std::runtime_error("empty body"));
 }
+void BaseRequestHandler::onBody(std::unique_ptr<folly::IOBuf> body) noexcept {
+  if (_body) {
+    _body->prependChain(std::move(body));
+  } else {
+    _body = std::move(body);
+  }
+}
+
 }

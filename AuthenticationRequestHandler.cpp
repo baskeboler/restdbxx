@@ -23,13 +23,6 @@ void AuthenticationRequestHandler::onRequest(std::unique_ptr<proxygen::HTTPMessa
   }
 }
 
-void AuthenticationRequestHandler::onBody(std::unique_ptr<folly::IOBuf> body) noexcept {
-  if (_body) {
-    _body->prependChain(std::move(body));
-  } else {
-    _body = std::move(body);
-  }
-}
 void AuthenticationRequestHandler::onUpgrade(proxygen::UpgradeProtocol prot) noexcept {
 
 }

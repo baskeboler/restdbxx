@@ -8,38 +8,17 @@
 #include "EndpointDescriptor.h"
 #include "Validations.h"
 #include <folly/Singleton.h>
-#include <boost/date_time/gregorian/gregorian.hpp>
-#include <boost/date_time/posix_time/posix_time.hpp>
 namespace restdbxx {
 namespace {
 struct DbManagerSingletonTag {};
-folly::Singleton<DbManager, DbManagerSingletonTag> the_instance;
+static folly::Singleton<DbManager, DbManagerSingletonTag> the_instance;
 
-static const std::string &ENDPOINTS_KEY() {
-  static const std::string value = "/__endpoints";
-  return value;
-}
-static const std::string &ENDPOINTS_COUNT_KEY() {
-  static const std::string value = "/__endpoints/count";
-  return value;
-}
-static const std::string &USERS_KEY() {
-  static const std::string value = "/__users";
-  return value;
-}
-static const std::string &TEST_ENDPOINT_KEY() {
-  static const std::string value = "/test_endpoint";
-  return value;
-}
-static const std::string &TOKENS_KEY() {
-  static const std::string value = "/__tokens";
-  return value;
-}
-
-static const std::string &ALL_OBJECTS_KEY() {
-  static const std::string value = "/___all_objects___";
-  return value;
-}
+constexpr const char ENDPOINTS_KEY[] = "/__endpoints";
+constexpr const char ENDPOINTS_COUNT_KEY[] = "/__endpoints/count";
+constexpr const char USERS_KEY[] = "/__users";
+constexpr const char TEST_ENDPOINT_KEY[] = "/test_endpoint";
+constexpr const char TOKENS_KEY[] = "/__tokens";
+constexpr const char ALL_OBJECTS_KEY[] = "/___all_objects___";
 }
 
 std::shared_ptr<DbManager> DbManager::get_instance() {
@@ -95,12 +74,12 @@ DbManager::DbManager() {
   }
   VLOG(GLOG_INFO) << "End of column families";
 
-  if (!is_endpoint(TEST_ENDPOINT_KEY())) {
-    _db->Put(rocksdb::WriteOptions(), ENDPOINTS_COUNT_KEY(), "0");
+  if (!is_endpoint(TEST_ENDPOINT_KEY)) {
+    _db->Put(rocksdb::WriteOptions(), ENDPOINTS_COUNT_KEY, "0");
     VLOG(GLOG_INFO) << "Test endpoint inexistent, creating.";
-    add_endpoint(TEST_ENDPOINT_KEY());
-    add_endpoint(USERS_KEY());
-    add_endpoint(TOKENS_KEY());
+    add_endpoint(TEST_ENDPOINT_KEY);
+    add_endpoint(USERS_KEY);
+    add_endpoint(TOKENS_KEY);
   }
 
   cleanTokens();
@@ -147,7 +126,7 @@ void DbManager::post(const std::string path, folly::dynamic &data) {
 
     rocksdb::WriteBatch batch;
     batch.Put(_cfh_map.at(path), new_path, new_val);
-    batch.Put(_cfh_map.at(ALL_OBJECTS_KEY()), new_path, new_val);
+    batch.Put(_cfh_map.at(ALL_OBJECTS_KEY), new_path, new_val);
     //batch.Put(new_path, new_val);
     int id = std::stoi(next_id);
     id++;
@@ -183,7 +162,7 @@ void DbManager::put(const std::string path, const folly::dynamic &data) {
       std::string val = folly::toPrettyJson(data);
       auto status = trx->Put(_cfh_map[path], new_key, val);
       if (status.ok())
-        status = trx->Put(_cfh_map.at(ALL_OBJECTS_KEY()), new_key, val);
+        status = trx->Put(_cfh_map.at(ALL_OBJECTS_KEY), new_key, val);
       if (status.ok())
         status = trx->Commit();
       if (!status.ok()) {
@@ -192,7 +171,7 @@ void DbManager::put(const std::string path, const folly::dynamic &data) {
         return;
       }
     } else {
-      _db->Put(rocksdb::WriteOptions(), _cfh_map.at(ALL_OBJECTS_KEY()), path, folly::toJson(data));
+      _db->Put(rocksdb::WriteOptions(), _cfh_map.at(ALL_OBJECTS_KEY), path, folly::toJson(data));
     }
   }
 }
@@ -256,18 +235,18 @@ void DbManager::add_endpoint(const std::string &path) {
     VLOG(google::GLOG_ERROR) << status.ToString();
   }
   auto txn = _db->BeginTransaction(rocksdb::WriteOptions());
-  status = txn->Get(rocksdb::ReadOptions(), ENDPOINTS_COUNT_KEY(), &count_str);
+  status = txn->Get(rocksdb::ReadOptions(), ENDPOINTS_COUNT_KEY, &count_str);
   if (!status.ok()) {
     VLOG(google::GLOG_ERROR) << status.ToString();
   }
   int count = std::atoi(count_str.c_str());
   auto endpoint = EndpointDescriptor::new_endpoint(count, path, "admin");
-  std::string endpoint_descr_key = ENDPOINTS_KEY() + path;
-  status = txn->Put(_cfh_map[ENDPOINTS_KEY()], endpoint_descr_key, folly::toPrettyJson(endpoint->getDynamic()));
+  std::string endpoint_descr_key = ENDPOINTS_KEY + path;
+  status = txn->Put(_cfh_map[ENDPOINTS_KEY], endpoint_descr_key, folly::toPrettyJson(endpoint->getDynamic()));
   if (!status.ok()) {
     VLOG(google::GLOG_ERROR) << status.ToString();
   }
-  status = txn->Put(ENDPOINTS_COUNT_KEY(), std::to_string(count));
+  status = txn->Put(ENDPOINTS_COUNT_KEY, std::to_string(count));
   if (!status.ok()) {
     VLOG(WARNING) << "Error creating column family: " << status.ToString();
   }
@@ -287,7 +266,7 @@ void DbManager::add_endpoint(const std::string &path) {
 
 std::vector<std::string> DbManager::get_endpoints() const {
   auto opts = rocksdb::ReadOptions();
-  auto iterator = _db->NewIterator(opts);
+  auto iterator = _db->GetBaseDB()->NewIterator(opts);
   std::vector<std::string> res;
   iterator->SeekToFirst();
   while (iterator->Valid()) {
@@ -319,7 +298,7 @@ folly::Optional<folly::dynamic> DbManager::get(const std::string path) const {
   }
 
   std::string value;
-  auto s = _db->Get(readOpts, _cfh_map.at(ALL_OBJECTS_KEY()), path, &value);
+  auto s = _db->Get(readOpts, _cfh_map.at(ALL_OBJECTS_KEY), path, &value);
   if (s.ok()) {
     return parseJson(value);
   }
@@ -333,8 +312,8 @@ bool DbManager::is_endpoint(const std::string &path) const {
 folly::Optional<folly::dynamic> DbManager::get_user(const std::string &username) {
 
   std::string value;
-  std::string key = USERS_KEY() + "/" + username;
-  auto s = _db->Get(rocksdb::ReadOptions(), _cfh_map.at(USERS_KEY()), key, &value);
+  std::string key = std::string(USERS_KEY) + "/" + username;
+  auto s = _db->Get(rocksdb::ReadOptions(), _cfh_map.at(USERS_KEY), key, &value);
   if (s.ok())
     return folly::parseJson(value);
   return folly::none;
@@ -343,7 +322,7 @@ void DbManager::get_all(const std::string &path, std::vector<folly::dynamic> &re
   if (_cfh_map.find(path) == _cfh_map.end() || _cfh_map[path] == nullptr) {
     throw DbManagerException("column family handle unavailable");
   }
-  auto s = _db->NewIterator(rocksdb::ReadOptions(), _cfh_map[path]);
+  auto s = _db->GetBaseDB()->NewIterator(rocksdb::ReadOptions(), _cfh_map[path]);
   s->SeekToFirst();
   while (s->Valid()) {
     VLOG(google::GLOG_INFO) << "Iterating over users " << s->key().ToString() << "  --  " << s->value().ToString();
@@ -381,12 +360,12 @@ void DbManager::perform_database_init_tasks() {
 
   std::vector<rocksdb::ColumnFamilyDescriptor> cfDescr = {
       rocksdb::ColumnFamilyDescriptor(rocksdb::kDefaultColumnFamilyName, cfOpts),
-      rocksdb::ColumnFamilyDescriptor(ALL_OBJECTS_KEY(), cfOpts),
-      rocksdb::ColumnFamilyDescriptor(ENDPOINTS_KEY(), cfOpts),
-      rocksdb::ColumnFamilyDescriptor(ENDPOINTS_COUNT_KEY(), cfOpts),
-      rocksdb::ColumnFamilyDescriptor(USERS_KEY(), cfOpts),
-      rocksdb::ColumnFamilyDescriptor(TEST_ENDPOINT_KEY(), cfOpts),
-      rocksdb::ColumnFamilyDescriptor(TOKENS_KEY(), cfOpts),
+      rocksdb::ColumnFamilyDescriptor(ALL_OBJECTS_KEY, cfOpts),
+      rocksdb::ColumnFamilyDescriptor(ENDPOINTS_KEY, cfOpts),
+      rocksdb::ColumnFamilyDescriptor(ENDPOINTS_COUNT_KEY, cfOpts),
+      rocksdb::ColumnFamilyDescriptor(USERS_KEY, cfOpts),
+      rocksdb::ColumnFamilyDescriptor(TEST_ENDPOINT_KEY, cfOpts),
+      rocksdb::ColumnFamilyDescriptor(TOKENS_KEY, cfOpts),
   };
   auto txnOpts = rocksdb::TransactionDBOptions();
   auto status = rocksdb::TransactionDB::Open(opts,
@@ -401,7 +380,7 @@ void DbManager::perform_database_init_tasks() {
   }
   auto writeOpts = rocksdb::WriteOptions();
 
-  status = db->Put(writeOpts, ENDPOINTS_COUNT_KEY(), "0");
+  status = db->Put(writeOpts, ENDPOINTS_COUNT_KEY, "0");
   if (!status.ok()) {
     VLOG(google::GLOG_ERROR) << status.ToString();
   }
@@ -427,19 +406,19 @@ bool DbManager::is_initialized() {
     VLOG(google::GLOG_WARNING) << status.ToString();
     return false;
   }
-  if (std::find(cfNames.begin(), cfNames.end(), ENDPOINTS_KEY()) == cfNames.end()) {
+  if (std::find(cfNames.begin(), cfNames.end(), ENDPOINTS_KEY) == cfNames.end()) {
     return false;
   }
-  if (std::find(cfNames.begin(), cfNames.end(), USERS_KEY()) == cfNames.end()) {
+  if (std::find(cfNames.begin(), cfNames.end(), USERS_KEY) == cfNames.end()) {
     return false;
   }
-  if (std::find(cfNames.begin(), cfNames.end(), ALL_OBJECTS_KEY()) == cfNames.end()) {
+  if (std::find(cfNames.begin(), cfNames.end(), ALL_OBJECTS_KEY) == cfNames.end()) {
     return false;
   }
-  if (std::find(cfNames.begin(), cfNames.end(), TEST_ENDPOINT_KEY()) == cfNames.end()) {
+  if (std::find(cfNames.begin(), cfNames.end(), TEST_ENDPOINT_KEY) == cfNames.end()) {
     return false;
   }
-  if (std::find(cfNames.begin(), cfNames.end(), TOKENS_KEY()) == cfNames.end()) {
+  if (std::find(cfNames.begin(), cfNames.end(), TOKENS_KEY) == cfNames.end()) {
     return false;
   }
   return true;
@@ -448,9 +427,9 @@ bool DbManager::is_initialized() {
 folly::dynamic DbManager::get_endpoint(const std::string &path) const {
 
   rocksdb::Status status;
-  std::string key = ENDPOINTS_KEY() + path;
+  std::string key = ENDPOINTS_KEY + path;
   std::string value;
-  status = _db->Get(rocksdb::ReadOptions(), _cfh_map.at(ENDPOINTS_KEY()), key, &value);
+  status = _db->Get(rocksdb::ReadOptions(), _cfh_map.at(ENDPOINTS_KEY), key, &value);
   if (status.ok()) {
     return folly::parseJson(value);
   }
@@ -462,13 +441,14 @@ void DbManager::raw_save(const std::string &key, folly::dynamic &data, const std
   auto txn = _db->BeginTransaction(rocksdb::WriteOptions());
   auto s = txn->Put(_cfh_map.at(cf_name), key, val);
   if (s.ok())
-    s = txn->Put(_cfh_map.at(ALL_OBJECTS_KEY()), key, val);
+    s = txn->Put(_cfh_map.at(ALL_OBJECTS_KEY), key, val);
   if (s.ok())
     s = txn->Commit();
   if (!s.ok()) {
     VLOG(google::GLOG_INFO) << "error saving token: " << s.ToString();
     txn->Rollback();
   }
+  delete txn;
 }
 folly::Optional<folly::dynamic> DbManager::raw_get(const std::string &key, const std::string &cf_name) {
   std::string value;
@@ -481,7 +461,7 @@ folly::Optional<folly::dynamic> DbManager::raw_get(const std::string &key, const
 }
 void DbManager::cleanTokens() {
   VLOG(google::GLOG_INFO) << "access token cleanup";
-  auto i = _db->NewIterator(rocksdb::ReadOptions(), _cfh_map.at(TOKENS_KEY()));
+  auto i = _db->NewIterator(rocksdb::ReadOptions(), _cfh_map.at(TOKENS_KEY));
   i->SeekToFirst();
   std::vector<std::string> expired;
   while (i->Valid()) {
@@ -500,14 +480,14 @@ void DbManager::cleanTokens() {
 
   for (auto &k: expired) {
     VLOG(google::GLOG_INFO) << "Deleting expired access token " << k;
-    s = _db->GetBaseDB()->Delete(opts, _cfh_map.at(TOKENS_KEY()), k);
+    s = _db->GetBaseDB()->Delete(opts, _cfh_map.at(TOKENS_KEY), k);
     if (!s.ok()) {
       VLOG(google::GLOG_INFO) << s.ToString();
     }
   }
 }
 folly::Optional<folly::dynamic> DbManager::raw_get(const std::string &key) {
-  return raw_get(key, ALL_OBJECTS_KEY());
+  return raw_get(key, ALL_OBJECTS_KEY);
 }
 void DbManager::delete_endpoint(const std::string &path) {
 
@@ -545,8 +525,8 @@ void DbManager::delete_endpoint(const std::string &path) {
   }
 
   VLOG(google::GLOG_INFO) << "Deleting endpoint descriptor ";
-  std::string descr_key = ENDPOINTS_KEY() + path;
-  s = txn->Delete(_cfh_map.at(ENDPOINTS_KEY()), descr_key);
+  std::string descr_key = ENDPOINTS_KEY + path;
+  s = txn->Delete(_cfh_map.at(ENDPOINTS_KEY), descr_key);
   if (!s.ok()) {
     throw DbManagerException(s.ToString());
   }

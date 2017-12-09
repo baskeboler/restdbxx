@@ -11,12 +11,10 @@
 #include "includes.h"
 #include "EndpointControllerFactory.h"
 #include "FiltersFactory.h"
-#include "UserManager.h"
 #include "AuthenticationRequestHandler.h"
 #include "FileServerRequestHandler.h"
 #include "GiphySearchRequestHandler.h"
 #include "XkcdRequestHandler.h"
-#include <memory>
 using proxygen::HTTPServer;
 
 

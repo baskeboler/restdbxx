@@ -81,13 +81,7 @@ folly::dynamic EndpointController::get_endpoints_dynamic() const {
   folly::dynamic result = folly::dynamic::array(endpoint_descrs);
   return result;
 }
-void EndpointController::onBody(std::unique_ptr<folly::IOBuf> body) noexcept {
-  if (_body) {
-    _body->prependChain(std::move(body));
-  } else {
-    _body = std::move(body);
-  }
-}
+
 void EndpointController::onUpgrade(proxygen::UpgradeProtocol prot) noexcept {
 
 }

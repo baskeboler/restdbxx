@@ -36,6 +36,8 @@ class BaseRequestHandler: public proxygen::RequestHandler {
   virtual void onEgressResumed()noexcept override {
     RequestHandler::onEgressResumed();
   }
+
+  void onBody(std::unique_ptr<folly::IOBuf> body) noexcept override;
  protected:
   std::unique_ptr<folly::IOBuf> _body;
   std::unique_ptr<proxygen::HTTPMessage> _headers;
