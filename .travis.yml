@@ -4,11 +4,8 @@ sudo: required
 addons:
   apt:
     sources:
-      - george-edison55-precise-backports
       - ubuntu-toolchain-r-test
     packages:
-      - cmake-data
-      - cmake
       - g++-7
 cache:
   - apt
