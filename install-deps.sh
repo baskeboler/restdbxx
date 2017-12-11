@@ -3,16 +3,9 @@
 export CC=gcc-7
 export CXX=g++-7
 
-# gflags
-git clone --depth 1 https://github.com/gflags/gflags
-cd gflags
-cmake .
-make all -j4
-sudo make install
-cd ..
-sudo ldconfig
 # rocksdb
 sudo apt-get install -yq \
+    libgflags-dev \
     libsnappy-dev \
     zlib1g-dev \
     libbz2-dev \
