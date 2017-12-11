@@ -19,8 +19,11 @@ sudo apt-get install -yq \
     libzstd-dev
 git clone https://github.com/facebook/rocksdb
 cd rocksdb
-make static_lib -j4
+cmake .
+make rocksdb -j4
 sudo make install
+cd ..
+
 
 # folly, wangle and proxygen
 git clone https://github.com/facebook/proxygen
