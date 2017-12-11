@@ -1,5 +1,5 @@
 # restdbxx
-
+[![Build Status](https://travis-ci.org/baskeboler/restdbxx.svg?branch=master)](https://travis-ci.org/baskeboler/restdbxx)
 
 ## dependencies
 
