@@ -12,7 +12,7 @@ set(BOOST_USE_STATIC_RUNTIME OFF)
 #set(CMAKE_FIND_LIBRARY_SUFFIXES .a)
 #set(CMAKE_CXX_COMPILER clang++)
 find_library(ROCKSDB rocksdb)
-find_package(Boost 1.60 COMPONENTS date_time filesystem system atomic thread serialization)
+find_package(Boost 1.50 COMPONENTS date_time filesystem system atomic thread serialization)
 INCLUDE_DIRECTORIES(/usr/local/include ${Boost_INCLUDE_DIRS})
 link_directories(/usr/local/lib)
 
