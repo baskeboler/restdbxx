@@ -6,4 +6,4 @@ addons:
     packages:
       - cmake-data
       - cmake
-script: cmake . && make
+script: ./install-deps.sh && cmake . && make
