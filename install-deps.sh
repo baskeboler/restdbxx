@@ -7,7 +7,7 @@ export CXX=g++-7
 git clone https://github.com/gflags/gflags
 cd gflags
 cmake .
-make install
+sudo make install -j4
 cd ..
 
 # rocksdb
@@ -19,7 +19,7 @@ sudo apt-get install -yq \
     libzstd-dev
 git clone https://github.com/facebook/rocksdb
 cd rocksdb
-make static_lib
+make static_lib -j4
 sudo make install
 
 # folly, wangle and proxygen

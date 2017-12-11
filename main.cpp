@@ -4,6 +4,7 @@
 #include <iostream>
 #include <folly/init/Init.h>
 #include <gflags/gflags.h>
+#include <glog/logging.h>
 #include <folly/io/async/EventBaseManager.h>
 #include <proxygen/httpserver/HTTPServer.h>
 #include <folly/executors/GlobalExecutor.h>
@@ -15,6 +16,7 @@
 #include "FileServerRequestHandler.h"
 #include "GiphySearchRequestHandler.h"
 #include "XkcdRequestHandler.h"
+
 using proxygen::HTTPServer;
 
 
@@ -44,8 +46,8 @@ void init_services();
 int main(int argc, char **argv) {
   using namespace proxygen;
 
-  folly::init(&argc, &argv);
-  gflags::ParseCommandLineFlags(&argc, &argv, true);
+  folly::init(&argc, &argv, false);
+  gflags::ParseCommandLineFlags(&argc, &argv, false);
   google::InstallFailureSignalHandler();
   initConfiguration();
   auto conf = restdbxx::RestDbConfiguration::get_instance();
