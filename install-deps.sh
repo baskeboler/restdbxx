@@ -10,7 +10,6 @@ sudo apt-get install -yq \
     zlib1g-dev \
     libbz2-dev \
     liblz4-dev \
-    libzstd-dev
 
 git clone --depth 1 https://github.com/facebook/rocksdb
 cd rocksdb
