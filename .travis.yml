@@ -10,6 +10,8 @@ addons:
       - cmake-data
       - cmake
       - g++-7
+cache:
+  - apt
 env:
   - MATRIX_EVAL="CC=gcc-7 && CXX=g++-7"
 before-install:
