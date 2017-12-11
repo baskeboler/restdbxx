@@ -4,12 +4,13 @@ export CC=gcc-7
 export CXX=g++-7
 
 # gflags
-git clone https://github.com/gflags/gflags
+git clone --depth 1 https://github.com/gflags/gflags
 cd gflags
 cmake .
-sudo make install -j4
+make all -j4
+sudo make install
 cd ..
-
+sudo ldconfig
 # rocksdb
 sudo apt-get install -yq \
     libsnappy-dev \
@@ -17,16 +18,16 @@ sudo apt-get install -yq \
     libbz2-dev \
     liblz4-dev \
     libzstd-dev
-git clone https://github.com/facebook/rocksdb
+
+git clone --depth 1 https://github.com/facebook/rocksdb
 cd rocksdb
-cmake .
-make rocksdb -j4
+OPTS="-DTRAVIS" make static_lib -j4
 sudo make install
 cd ..
 
 
 # folly, wangle and proxygen
-git clone https://github.com/facebook/proxygen
+git clone --depth 1 https://github.com/facebook/proxygen
 cd proxygen/proxygen
 ./deps.sh
 
