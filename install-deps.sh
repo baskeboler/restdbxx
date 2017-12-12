@@ -2,6 +2,7 @@
 
 export CC=gcc-7
 export CXX=g++-7
+export EXTRA_CXXFLAGS="-Wno-format -Wno-format-truncation"
 
 # rocksdb
 sudo apt-get install -yq \
