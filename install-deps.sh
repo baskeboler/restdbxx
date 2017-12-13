@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 
-export CC=gcc-7
-export CXX=g++-7
+export CC=gcc-5
+export CXX=g++-5
 export EXTRA_CXXFLAGS="-Wno-format -Wno-format-truncation"
 
 # rocksdb
